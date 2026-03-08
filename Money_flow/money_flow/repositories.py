@@ -10,19 +10,19 @@ class ExpenseRepository:
     def _connect(self):
         return self._db.connect()
 
+    def _row_to_expense(self, row):
+        return Expense(
+            deal_id=row["deal_id"],
+            amount=row["amount"],
+            money_source=row["money_source"],
+            category=row["category"],
+            created_at=row["created_at"],
+        )
+
     def load(self):
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM expenses").fetchall()
-        return [
-            Expense(
-                deal_id=row["deal_id"],
-                amount=row["amount"],
-                money_source=row["money_source"],
-                category=row["category"],
-                created_at=row["created_at"],
-            )
-            for row in rows
-        ]
+        return [self._row_to_expense(row) for row in rows]
 
     def get_by_id(self, deal_id):
         with self._connect() as conn:
@@ -34,13 +34,7 @@ class ExpenseRepository:
         if not row:
             raise ExpenseNotFoundError()
 
-        return Expense(
-            deal_id=row["deal_id"],
-            amount=row["amount"],
-            money_source=row["money_source"],
-            category=row["category"],
-            created_at=row["created_at"],
-        )
+        return self._row_to_expense(row)
 
     def by_category(self, category):
         with self._connect() as conn:
@@ -48,16 +42,49 @@ class ExpenseRepository:
                 "SELECT * FROM expenses WHERE category=?",
                 (category,)
             ).fetchall()
-            return [
-                Expense(
-                    deal_id=row["deal_id"],
-                    amount=row["amount"],
-                    money_source=row["money_source"],
-                    category=row["category"],
-                    created_at=row["created_at"],
-                )
-                for row in rows
-            ]
+
+            return [self._row_to_expense(row) for row in rows]
+
+    def get_filtered(
+            self,
+            category=None,
+            money_source=None,
+            date_from=None,
+            date_to=None,
+            sort_by="created_at",
+            order="desc",
+    ):
+        allowed_sort = {"created_at", "amount", "category"}
+        if sort_by not in allowed_sort:
+            sort_by = "created_at"
+
+        order = "DESC" if order.lower() == "desc" else "ASC"
+
+        query = "SELECT * FROM expenses WHERE 1=1"
+        params = []
+
+        if category:
+            query += " AND category=?"
+            params.append(category)
+
+        if money_source:
+            query += " AND money_source=?"
+            params.append(money_source)
+
+        if date_from:
+            query += " AND created_at >= ?"
+            params.append(date_from)
+
+        if date_to:
+            query += " AND created_at <= ?"
+            params.append(date_to)
+
+        query += f" ORDER BY {sort_by} {order}"
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+        return [self._row_to_expense(row) for row in rows]
 
     def spend_atomic(self, expense: Expense):
         with self._connect() as conn:
@@ -170,13 +197,18 @@ class ExpenseRepository:
             if old_source == new_source:
                 diff = new_amount - old_amount
 
-                if diff > 0 and new_account_row["balance"] < diff:
-                    raise NotEnoughMoneyError()
-
-                cur.execute(
-                    "UPDATE accounts SET balance = balance - ? WHERE name=?",
-                    (diff, old_source)
-                )
+                if diff > 0:
+                    if new_account_row["balance"] < diff:
+                        raise NotEnoughMoneyError()
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance - ? WHERE name=?",
+                        (diff, old_source)
+                    )
+                elif diff < 0:
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance + ? WHERE name=?",
+                        (-diff, old_source)
+                    )
 
             #Account change
             else:
@@ -271,6 +303,9 @@ class AccountRepository:
 
     def transfer_atomic(self, from_acc: str, to_acc: str, amount: float):
         with self._connect() as conn:
+            if from_acc == to_acc:
+                return
+
             #Check old account
             cur = conn.execute(
                 "SELECT balance FROM accounts WHERE name = ?",

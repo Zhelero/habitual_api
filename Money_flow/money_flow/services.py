@@ -37,6 +37,24 @@ class ExpenseService:
     def by_category(self, category):
         return self.repo.by_category(category)
 
+    def get_filtered(
+            self,
+            category=None,
+            money_source=None,
+            date_from=None,
+            date_to=None,
+            sort_by="created_at",
+            order="desc",
+    ):
+        return self.repo.get_filtered(
+            category,
+            money_source,
+            date_from,
+            date_to,
+            sort_by,
+            order,
+        )
+
     def total(self, category=None):
         return self.repo.total(category)
 

@@ -23,11 +23,22 @@ def create(
 @router.get("/", response_model=List[ExpenseResponse])
 def read_expenses(
         category: str | None = None,
+        money_source: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        sort_by: str = "created_at",
+        order: str = "desc",
         service: ExpenseService = Depends(get_expense_service),
 ):
-    if category:
-        return service.by_category(category)
-    return service.load_expenses()
+        return service.get_filtered(
+            category=category,
+            money_source=money_source,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            order=order,
+        )
+
 
 @router.delete("/{deal_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_expense(
