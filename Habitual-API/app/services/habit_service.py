@@ -1,7 +1,15 @@
 from datetime import date, timedelta
+from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from app.repositories.habit_repository import HabitRepository
+from app.services.helpers import calculate_best_streak
+from app.core.exceptions import (
+    HabitAlreadyMarkedError,
+    HabitAlreadyExistsError,
+    HabitNotMarkedError,
+    NotFoundError,
+)
 
 class HabitService:
     def __init__(self, repo: HabitRepository):
@@ -13,12 +21,12 @@ class HabitService:
         try:
             return self.repo.create_habit(name, description)
         except IntegrityError:
-            raise ValueError("Habit with this name already exists")
+            raise HabitAlreadyExistsError()
 
 
     # Update habit
 
-    def update_habit(self, habit_id: int, data: dict):
+    def update_habit(self, habit_id: int, data: dict[str, Any]):
         self._get_habit_or_raise(habit_id)
 
         allowed_fields = {"name", "description"}
@@ -28,17 +36,28 @@ class HabitService:
             return self.repo.get_habit_by_id(habit_id)
 
         try:
-            self.repo.update_habit(habit_id, update_data)
+            updated = self.repo.update_habit(habit_id, update_data)
         except IntegrityError:
-            raise ValueError("Habit with this name already exists")
+            raise HabitAlreadyExistsError()
 
-        return self.repo.get_habit_by_id(habit_id)
+        return updated
 
 
     # Get all habits
 
     def get_habits(self):
         return self.repo.get_all_habits()
+
+    def get_habits_paginated(self, limit: int, offset: int):
+        habits = self.repo.get_habits_paginated(limit, offset)
+        total = self.repo.count_habits()
+
+        return {
+            "items": habits,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
 
 
     # Delete habit
@@ -58,7 +77,7 @@ class HabitService:
         try:
             return self.repo.add_log(habit_id, today)
         except IntegrityError:
-            raise ValueError("Habit already marked as done today")
+            raise HabitAlreadyMarkedError()
 
 
     # Undo mark done
@@ -70,9 +89,10 @@ class HabitService:
 
         deleted = self.repo.delete_log(habit_id, today)
         if not deleted:
-            raise ValueError("Habit was not marked as done today")
+            raise HabitNotMarkedError()
 
         return True
+
 
     # Stats
 
@@ -94,20 +114,30 @@ class HabitService:
             current_day -= timedelta(days=1)
 
         # Best streak
-        best_streak = self._calculate_best_streak(log_dates)
+        best_streak = calculate_best_streak(log_dates)
 
-        # Completion rate (last 30 days)
-        completion_last_7_days = self._calculate_completion_percentage(log_dates, 7)
-        completion_last_30_days = self._calculate_completion_percentage(log_dates, 30)
+        count_7 = self.repo.count_logs_between(
+            habit_id,
+            today - timedelta(days=6),
+            today
+        )
 
-        # Last 7 days stats
-        last_7_days = []
-        for i in range(6, -1, -1):
-            day = today - timedelta(days=i)
-            last_7_days.append({
-                "date": day,
-                "done": day in log_dates,
-            })
+        count_30 = self.repo.count_logs_between(
+            habit_id,
+            today - timedelta(days=29),
+            today
+        )
+
+        completion_last_7_days = round((count_7 / 7) * 100, 2)
+        completion_last_30_days = round((count_30 / 30) * 100, 2)
+
+        last_7_days = [
+            {
+                "date": today - timedelta(days=i),
+                "done": (today - timedelta(days=i)) in log_dates,
+            }
+            for i in range(6, -1, -1)
+        ]
 
         return {
             "current_streak": streak,
@@ -124,43 +154,14 @@ class HabitService:
 
         return self.repo.get_heatmap(habit_id)
 
+
     # Helper
 
     def _get_habit_or_raise(self, habit_id: int):
         habit = self.repo.get_habit_by_id(habit_id)
 
         if not habit:
-            raise ValueError("Habit not found")
+            raise NotFoundError("Habit not found")
 
         return habit
 
-    def _calculate_completion_percentage(self, log_dates: set[date], days: int):
-        today = date.today()
-        start_date = today - timedelta(days=days - 1)
-
-        count = sum(
-            1
-            for single_date in log_dates
-            if start_date <= single_date <= today
-        )
-
-        return round((count / days) * 100, 2)
-
-    def _calculate_best_streak(self, log_dates: set[date]) -> int:
-
-        if not log_dates:
-            return 0
-
-        sorted_dates = sorted(log_dates)
-
-        best = 1
-        current = 1
-
-        for i in range(1, len(sorted_dates)):
-            if sorted_dates[i] == sorted_dates[i-1] + timedelta(days=1):
-                current += 1
-                best = max(best, current)
-            else:
-                current = 1
-
-        return best

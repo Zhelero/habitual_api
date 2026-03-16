@@ -1,8 +1,7 @@
 from datetime import date, timedelta
-from typing import Any, Sequence
 
-from sqlalchemy.orm import Session
-from sqlalchemy import select, delete, func, case, text, update, Row, RowMapping
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy import select, delete, func, case, update
 
 from app.db.models import Habit, HabitLog
 
@@ -45,6 +44,17 @@ class HabitRepository:
 
         return result.scalar_one_or_none()
 
+    def get_habits_paginated(self, limit: int, offset: int) -> list[Habit]:
+        return (
+            self.db.query(Habit)
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+    def count_habits(self):
+        return self.db.query(Habit).count()
+
     def delete_habit(self, habit_id: int) -> bool:
         stmt = delete(Habit).where(Habit.id == habit_id)
         result = self.db.execute(stmt)
@@ -56,18 +66,6 @@ class HabitRepository:
     # LOGS
 
     def add_log(self, habit_id: int, log_date: date) -> HabitLog | None:
-
-        existing = self.db.execute(
-            select(HabitLog)
-            .where(
-                HabitLog.habit_id == habit_id,
-                HabitLog.date == log_date
-            )
-        ).scalar_one_or_none()
-
-        if existing:
-            return existing
-
         log = HabitLog(habit_id=habit_id, date=log_date)
 
         self.db.add(log)
@@ -78,17 +76,33 @@ class HabitRepository:
 
     def get_logs_by_habit(self, habit_id: int) -> list[HabitLog]:
         stmt = (
-            select(HabitLog).
-            where(HabitLog.habit_id == habit_id)
+            select(HabitLog)
+            .where(HabitLog.habit_id == habit_id)
             .order_by(HabitLog.date.desc())
         )
         result = self.db.execute(stmt)
 
         return result.scalars().all()
 
+    def get_all_logs(self) -> list[dict]:
+        stmt = select(HabitLog.habit_id, HabitLog.date).order_by(HabitLog.date)
+
+        return self.db.execute(stmt).scalars().all()
+
+    def count_logs_between(self, habit_id: int, start: date, end: date):
+        stmt = (
+            select(func.count())
+            .select_from(HabitLog)
+            .where(
+                HabitLog.habit_id == habit_id,
+                HabitLog.date >= start,
+                HabitLog.date <= end
+            )
+        )
+
+        return self.db.execute(stmt).scalar()
 
     def delete_log(self, habit_id: int, log_date: date):
-
         stmt = (
             delete(HabitLog)
             .where(
@@ -109,18 +123,18 @@ class HabitRepository:
         stmt = (
             select(
                 func.count().label("total"),
-                func.sum(
-                    case(
-                        (HabitLog.date >= week_ago, 1),
-                        else_=0
-                    )
-                ).label("last7"),
-                (
+                func.coalesce(
                     func.sum(
                         case(
-                            (HabitLog.date >= week_ago, 1),
-                            else_=0
-                        )
+                        (HabitLog.date >= week_ago, 1), else_=0)
+                    ),
+                    0
+                ).label("last7"),
+                (
+                    func.coalesce(
+                        func.sum(case(
+                            (HabitLog.date >= week_ago, 1), else_=0)),
+                            0
                     ) * 100.0 / 7
                 ).label("completion_rate")
             )
@@ -132,7 +146,7 @@ class HabitRepository:
         total = result.total or 0
         last7 = result.last7 or 0
 
-        completion_rate = round(result.completion_rate or 2, 2)
+        completion_rate = round(result.completion_rate, 2)
 
         return {
             "total": total,
@@ -141,30 +155,34 @@ class HabitRepository:
         }
 
     def get_heatmap(self, habit_id: int):
+        start = func.date(func.now(), "-29 days")
+        end = func.date(func.now())
 
-        query = text("""
-            WITH RECURSIVE dates(date) AS (
-                SELECT DATE('now', '-29 days')
-                UNION ALL
-                SELECT DATE(date, '+1 day')
-                FROM dates
-                WHERE date < DATE('now')
+        #recursive CTE
+        dates = select(start.label("date")).cte(name="dates", recursive=True)
+
+        dates_alias = aliased(dates)
+
+        dates = dates.union_all(
+            select(func.date(dates_alias.c.date, "+1 day"))
+            .where(dates_alias.c.date < end)
+        )
+
+        stmt = (
+            select(
+                dates.c.date,
+                (HabitLog.id.is_not(None)).label("done")
             )
-            
-            SELECT
-                dates.date as date,
-                CASE
-                    WHEN habit_logs.id IS NULL THEN 0
-                    ELSE 1
-                END as done
-            FROM dates
-            LEFT JOIN habit_logs
-                ON habit_logs.date = dates.date
-                AND habit_logs.habit_id = :habit_id
-            ORDER BY dates.date
-        """)
+            .select_from(dates)
+            .outerjoin(
+                HabitLog,
+                (HabitLog.date == dates.c.date) &
+                (HabitLog.habit_id == habit_id)
+            )
+            .order_by(dates.c.date)
+        )
 
-        result = self.db.execute(query, {"habit_id": habit_id})
+        result = self.db.execute(stmt)
 
         return [
             {
@@ -173,3 +191,11 @@ class HabitRepository:
             }
             for row in result
         ]
+
+    def count_completed_today(self):
+        stmt = (
+            select(func.count())
+            .select_from(HabitLog)
+            .where(HabitLog.date == date.today()))
+
+        return self.db.execute(stmt).scalar()
