@@ -20,8 +20,9 @@ class HabitService:
     def create_habit(self, name: str, description: str | None):
         try:
             return self.repo.create_habit(name, description)
-        except IntegrityError:
-            raise HabitAlreadyExistsError()
+        except IntegrityError as e:
+            print(e)
+            raise
 
 
     # Update habit

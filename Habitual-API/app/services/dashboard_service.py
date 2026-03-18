@@ -17,8 +17,8 @@ class DashboardService:
 
         logs_by_habit: dict[int, set[date]] = {}
 
-        for log in logs:
-            logs_by_habit.setdefault(log.habit_id, set()).add(log.date)
+        for habit_id, log_date in logs:
+            logs_by_habit.setdefault(habit_id, set()).add(log_date)
 
         best_streak = 0
 

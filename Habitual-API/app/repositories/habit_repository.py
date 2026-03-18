@@ -28,9 +28,11 @@ class HabitRepository:
             .returning(Habit)
         )
         result = self.db.execute(stmt)
+        updated = result.scalar_one_or_none()
+
         self.db.commit()
 
-        return result.scalar_one_or_none()
+        return updated
 
     def get_all_habits(self) -> list[Habit]:
         stmt = select(Habit).order_by(Habit.created_at.desc())
@@ -84,10 +86,10 @@ class HabitRepository:
 
         return result.scalars().all()
 
-    def get_all_logs(self) -> list[dict]:
+    def get_all_logs(self):
         stmt = select(HabitLog.habit_id, HabitLog.date).order_by(HabitLog.date)
 
-        return self.db.execute(stmt).scalars().all()
+        return self.db.execute(stmt).all()
 
     def count_logs_between(self, habit_id: int, start: date, end: date):
         stmt = (

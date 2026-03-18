@@ -3,9 +3,8 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.base import Base
-from app.db.session import engine
 from app.api.routers import habits, dashboard
+from app.db.init_db import init_db
 from app.core.exceptions import AppError
 from app.core.handlers import app_error_handler
 from app.core.middleware import log_requests
@@ -17,15 +16,6 @@ logging.basicConfig(
 
 app = FastAPI(title="Habitual API")
 
-app.middleware("http")(log_requests)
-
-app.include_router(habits.router)
-app.include_router(dashboard.router)
-
-app.add_exception_handler(AppError, app_error_handler)
-
-
-
 #CORS
 app.add_middleware(
     CORSMiddleware,
@@ -35,10 +25,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def on_startup():
-    Base.metadata.create_all(bind=engine)
+app.middleware("http")(log_requests)
+
+app.include_router(habits.router, prefix="/habits", tags=["habits"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+app.add_exception_handler(AppError, app_error_handler)
+
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "Habitual API",
+    }
+
+@app.on_event("startup")
+def startup():
+    init_db()
+    logging.info("Database initialized")
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}

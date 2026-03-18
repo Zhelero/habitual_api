@@ -1,18 +1,17 @@
 from datetime import datetime, date
 
-from sqlalchemy import String, Date, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import String, Date, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 from app.db.base import Base
 
 class Habit(Base):
     __tablename__ = 'habits'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), server_onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     logs: Mapped[list["HabitLog"]] = relationship(
         back_populates="habit",
