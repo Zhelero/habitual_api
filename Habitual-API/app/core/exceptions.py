@@ -34,3 +34,19 @@ class AtLeastOneFieldError(AppError):
 class NameCannotBeEmptyError(AppError):
     status_code = 400
     detail = "Name can not be empty"
+
+class UserAlreadyExistsError(AppError):
+    status_code = 409
+    detail = "User already exists"
+
+class InvalidCredentialsError(AppError):
+    status_code = 400
+    detail = "Invalid credentials"
+
+class UserNotFoundError(AppError):
+    status_code = 404
+    detail = "User not found"
+
+class InvalidTokenError(AppError):
+    status_code = 401
+    detail = "Invalid token"

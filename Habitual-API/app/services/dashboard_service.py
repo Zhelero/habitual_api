@@ -7,18 +7,18 @@ class DashboardService:
     def __init__(self, repo: HabitRepository):
         self.repo = repo
 
-    def get_dashboard_stats(self):
+    def get_dashboard_stats(self, user_id: int) -> dict[str, int]:
 
-        habits = self.repo.get_all_habits()
-        logs = self.repo.get_all_logs()
+        habits = self.repo.get_all_habits(user_id)
+        logs = self.repo.get_all_logs(user_id)
 
         total_habits = len(habits)
-        completed_today = self.repo.count_completed_today()
+        completed_today = self.repo.count_completed_today(user_id)
 
         logs_by_habit: dict[int, set[date]] = {}
 
-        for habit_id, log_date in logs:
-            logs_by_habit.setdefault(habit_id, set()).add(log_date)
+        for log in logs:
+            logs_by_habit.setdefault(log.habit_id, set()).add(log.date)
 
         best_streak = 0
 
