@@ -1,17 +1,30 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, field_validator
 from datetime import datetime, date
+from typing import Literal
 
 from app.core.exceptions import AtLeastOneFieldError, NameCannotBeEmptyError
 
 class AuthRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1)
 
 class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str
+    token_type: Literal["bearer"]
     user_id: int
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(
+        min_length=1,
+        description="JWT refresh token",
+    )
+
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+
+    model_config = ConfigDict(from_attributes=True)
 
 class HabitCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -55,7 +68,7 @@ class HabitUpdate(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, value: str):
+    def validate_name(cls, value: str | None):
         value = _normalize_str(value)
 
         if not value:
