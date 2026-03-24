@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 import uuid
 
-from app.core.exceptions import InvalidTokenError
+from app.core.exceptions import InvalidTokenError, TokenRevokedError
 from app.core.config import settings
 
 SECRET_KEY = settings.SECRET_KEY
@@ -24,17 +24,33 @@ def create_token(data: dict, expires_delta: timedelta) -> str:
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def decode_token(token: str, expected_type: str | None = None) -> dict:
+def decode_token(
+        token: str,
+        expected_type: str | None = None,
+        blacklist_repo=None,
+) -> dict:
+    if not token:
+        raise InvalidTokenError("Empty token")
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as e:
         raise InvalidTokenError(str(e))
 
-    if expected_type and payload.get("type") != expected_type:
-        raise InvalidTokenError()
-
     if "sub" not in payload:
         raise InvalidTokenError("Missing subject")
+
+    token_type=payload.get("type")
+    if not token_type:
+        raise InvalidTokenError("Missing token type")
+
+    jti = get_jti(payload)
+
+    if expected_type and token_type != expected_type:
+        raise InvalidTokenError("Invalid token type")
+
+    if blacklist_repo and blacklist_repo.is_blacklisted(jti):
+        raise TokenRevokedError()
 
     return payload
 
@@ -49,3 +65,11 @@ def create_refresh_token(data: dict) -> str:
         {**data, "type": "refresh"},
         timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     )
+
+# HELPER
+
+def get_jti(payload:dict) -> str:
+    jti = payload.get("jti")
+    if not jti:
+        raise InvalidTokenError("Missing jti")
+    return jti

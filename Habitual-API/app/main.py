@@ -29,9 +29,9 @@ app.add_middleware(
 
 app.middleware("http")(log_requests)
 
-app.include_router(habits.router, prefix="/habits", tags=["habits"])
-app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(habits.router, tags=["habits"])
+app.include_router(dashboard.router, tags=["dashboard"])
+app.include_router(auth.router, tags=["auth"])
 
 app.add_exception_handler(AppError, app_error_handler)
 

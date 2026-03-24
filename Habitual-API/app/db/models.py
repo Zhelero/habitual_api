@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import String, Date, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,10 +8,24 @@ class User(Base):
     __tablename__ = 'users'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(
+        timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
     habits: Mapped[list["Habit"]] = relationship(
         back_populates="user",
@@ -31,8 +45,17 @@ class Habit(Base):
     user: Mapped["User"] = relationship(back_populates="habits")
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
 
     logs: Mapped[list["HabitLog"]] = relationship(
         back_populates="habit",
@@ -51,9 +74,38 @@ class HabitLog(Base):
 
     id: Mapped[int] = mapped_column( primary_key=True)
 
-    habit_id: Mapped[int] = mapped_column(ForeignKey('habits.id', ondelete="CASCADE"), nullable = False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    habit_id: Mapped[int] = mapped_column(ForeignKey('habits.id', ondelete="CASCADE"), nullable=    False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
     date: Mapped[date] = mapped_column(Date, nullable=False)
 
     habit: Mapped["Habit"] = relationship(back_populates="logs")
 
+class TokenBlacklist(Base):
+    __tablename__ = "token_blacklist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    jti: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    def __repr__(self):
+        return f"<TokenBlacklist jti={self.jti}>"

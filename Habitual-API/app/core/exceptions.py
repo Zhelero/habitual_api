@@ -50,3 +50,7 @@ class UserNotFoundError(AppError):
 class InvalidTokenError(AppError):
     status_code = 401
     detail = "Invalid token"
+
+class TokenRevokedError(AppError):
+    status_code = 401
+    detail = "Token revoked"

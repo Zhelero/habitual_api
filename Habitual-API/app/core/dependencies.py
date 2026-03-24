@@ -1,16 +1,17 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from jose import JWTError
 
 from app.db.deps import get_db
 from app.core.jwt import decode_token
 from app.db.models import User
 from app.repositories.habit_repository import HabitRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.blacklist_repository import TokenBlacklistRepository
 from app.services.habit_service import HabitService
 from app.services.dashboard_service import DashboardService
 from app.services.auth_service import AuthService
+from app.core.exceptions import InvalidTokenError, TokenRevokedError
 
 security = HTTPBearer(auto_error=False)
 
@@ -30,12 +31,22 @@ def get_habit_repository(
 ) -> HabitRepository:
     return HabitRepository(db)
 
+
+# TOKEN BLACKLIST
+
+def get_blacklist_repository(
+        db: Session = Depends(get_db),
+) -> TokenBlacklistRepository:
+    return TokenBlacklistRepository(db)
+
+
 # SERVICES
 
 def get_auth_service(
         repo: UserRepository = Depends(get_user_repository),
+        blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
 ) -> AuthService:
-    return AuthService(repo)
+    return AuthService(repo, blacklist_repo)
 
 def get_habit_service(
         repo: HabitRepository = Depends(get_habit_repository),
@@ -48,11 +59,13 @@ def get_dashboard_service(
 ) -> DashboardService:
     return DashboardService(repo)
 
+
 # AUTH
 
 def get_current_user(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         repo: UserRepository = Depends(get_user_repository),
+        blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
 ) -> User:
 
     if not credentials:
@@ -61,18 +74,17 @@ def get_current_user(
     token = credentials.credentials
 
     try:
-        payload = decode_token(token)
-    except JWTError:
+        payload = decode_token(
+            token,
+            expected_type="access",
+            blacklist_repo=blacklist_repo
+        )
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)
+    except TokenRevokedError:
+        raise HTTPException(status_code=401, detail="Token revoked")
 
-    user_id_str = payload.get("sub")
-    if not user_id_str:
-        raise HTTPException(status_code=401, detail=UNAUTHORIZED)
-
-    try:
-        user_id = int(user_id_str)
-    except ValueError:
-        raise HTTPException(status_code=401, detail=UNAUTHORIZED)
+    user_id = int(payload["sub"])
 
     user = repo.get_by_id(user_id)
     if not user:
