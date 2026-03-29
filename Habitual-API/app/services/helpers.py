@@ -18,3 +18,9 @@ def calculate_best_streak(log_dates: set[date]) -> int:
             current_streak = 1
 
     return best_streak
+
+def normalize_str(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip().lower()
+    return value or None

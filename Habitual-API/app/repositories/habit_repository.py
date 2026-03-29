@@ -101,6 +101,7 @@ class HabitRepository:
         try:
             self.db.flush()
         except IntegrityError:
+            self.db.rollback()
             return None
 
         return log
@@ -228,7 +229,6 @@ class HabitRepository:
                 (HabitLog.date == dates.c.date) &
                 (HabitLog.habit_id == habit_id)
             )
-            .where(Habit.id.in_(self._habit_subquery(user_id)))
             .order_by(dates.c.date)
         )
 

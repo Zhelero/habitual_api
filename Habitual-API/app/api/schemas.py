@@ -1,18 +1,35 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, field_validator, constr
 from datetime import datetime, date
 from typing import Literal
 
+from app.services.helpers import normalize_str
 from app.core.exceptions import AtLeastOneFieldError, NameCannotBeEmptyError
+
 
 class AuthRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1)
+    password: str
 
 class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: Literal["bearer"]
     user_id: int
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str):
+        if not v or not v.strip():
+            raise ValueError("Password cannot be empty")
+
+        if len(v.strip()) < 6:
+            raise ValueError("Password must be at least 6 characters")
+
+        return v
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(
@@ -33,7 +50,7 @@ class HabitCreate(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str | None):
-        value = _normalize_str(value)
+        value = normalize_str(value)
 
         if not value:
             raise NameCannotBeEmptyError("Name can't be empty")
@@ -43,7 +60,7 @@ class HabitCreate(BaseModel):
     @field_validator("description")
     @classmethod
     def validate_description(cls, value: str | None):
-        return _normalize_str(value)
+        return normalize_str(value)
 
 
 class HabitResponse(BaseModel):
@@ -69,7 +86,7 @@ class HabitUpdate(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str | None):
-        value = _normalize_str(value)
+        value = normalize_str(value)
 
         if not value:
             raise NameCannotBeEmptyError("Name can't be empty")
@@ -79,7 +96,7 @@ class HabitUpdate(BaseModel):
     @field_validator("description")
     @classmethod
     def validate_description(cls, value: str | None):
-        return _normalize_str(value)
+        return normalize_str(value)
 
 class HabitHeatmap(BaseModel):
     date: date
@@ -104,11 +121,3 @@ class PaginatedHabits(BaseModel):
     total: int
     limit: int
     offset: int
-
-# HELPERS
-
-def _normalize_str(value: str | None) -> str | None:
-    if value is None:
-        return None
-    value = value.strip()
-    return value or None

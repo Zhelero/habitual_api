@@ -35,5 +35,4 @@ class TokenBlacklistRepository:
         stmt = delete(TokenBlacklist).where(TokenBlacklist.expires_at < now)
 
         result = self.db.execute(stmt)
-        self.db.commit()
         return result.rowcount

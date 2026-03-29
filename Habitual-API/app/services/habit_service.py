@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone, datetime
 from typing import Any
 from sqlalchemy.exc import IntegrityError
 
@@ -50,10 +50,7 @@ class HabitService:
 
     # Get all habits
 
-    def get_habits(self, user_id: int) -> list[Habit]:
-        return self.repo.get_all_habits(user_id)
-
-    def get_habits_paginated(self, user_id: int, limit: int, offset: int) -> dict[str, Any]:
+    def get_habits(self, user_id: int, limit: int, offset: int) -> dict[str, Any]:
         habits = self.repo.get_habits_paginated(user_id, limit, offset)
         total = self.repo.count_habits(user_id)
 
@@ -67,20 +64,20 @@ class HabitService:
 
     # Delete habit
 
-    def delete_habit(self, user_id: int, habit_id: int) -> bool:
+    def delete_habit(self, user_id: int, habit_id: int):
         self._get_habit_or_raise(user_id, habit_id)
-        return self.repo.delete_habit(user_id, habit_id)
+        self.repo.delete_habit(user_id, habit_id)
+        return None
 
-
-    # Mark done
+        # Mark done
 
     def mark_done(self, user_id: int, habit_id: int) -> HabitLog:
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         self._get_habit_or_raise(user_id, habit_id)
 
         log = self.repo.add_log(user_id, habit_id, today)
-        if not log:
+        if log is None:
             raise HabitAlreadyMarkedError()
 
         return log
@@ -88,7 +85,7 @@ class HabitService:
     # Undo mark done
 
     def undo_done(self, user_id: int, habit_id: int) -> bool:
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         self._get_habit_or_raise(user_id, habit_id)
 
@@ -108,7 +105,7 @@ class HabitService:
         logs = self.repo.get_logs_by_habit(user_id, habit_id)
         log_dates = {log.date for log in logs}
 
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         # Current streak
         streak = 0

@@ -71,7 +71,7 @@ def get_current_user(
     if not credentials:
         raise HTTPException(status_code=401, detail=NOT_AUTHENTICATED)
 
-    token = credentials.credentials
+    token = credentials.credentials.strip()
 
     try:
         payload = decode_token(
@@ -82,9 +82,12 @@ def get_current_user(
     except InvalidTokenError:
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)
     except TokenRevokedError:
-        raise HTTPException(status_code=401, detail="Token revoked")
+        raise HTTPException(status_code=401, detail=UNAUTHORIZED)
 
-    user_id = int(payload["sub"])
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError):
+        raise HTTPException(status_code=401, detail=UNAUTHORIZED)
 
     user = repo.get_by_id(user_id)
     if not user:

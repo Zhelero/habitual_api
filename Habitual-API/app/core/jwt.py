@@ -34,8 +34,8 @@ def decode_token(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError as e:
-        raise InvalidTokenError(str(e))
+    except JWTError:
+        raise InvalidTokenError("Invalid token")
 
     if "sub" not in payload:
         raise InvalidTokenError("Missing subject")

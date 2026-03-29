@@ -39,8 +39,16 @@ class UserAlreadyExistsError(AppError):
     status_code = 409
     detail = "User already exists"
 
-class InvalidCredentialsError(AppError):
+class PasswordCannotBeEmptyError(AppError):
     status_code = 400
+    detail = "Password can not be empty"
+
+class PasswordTooShortError(AppError):
+    status_code = 400
+    detail = "Password too short"
+
+class InvalidCredentialsError(AppError):
+    status_code = 401
     detail = "Invalid credentials"
 
 class UserNotFoundError(AppError):

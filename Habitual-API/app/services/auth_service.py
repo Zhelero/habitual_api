@@ -12,7 +12,6 @@ from app.core.exceptions import (
     InvalidCredentialsError,
     UserNotFoundError,
     InvalidTokenError,
-    TokenRevokedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ class AuthService:
         self.blacklist_repo = blacklist_repo
 
     def register(self, email: str, password: str) -> dict[str, str | int]:
-        email = email.lower().strip()
+        email = self._normalize_email(email)
         password_hash = hash_password(password)
 
         try:
@@ -41,7 +40,7 @@ class AuthService:
         return self._build_auth_response(user, tokens)
 
     def login(self, email: str, password: str) -> dict[str, str | int]:
-        email = email.lower().strip()
+        email = self._normalize_email(email)
 
         user = self.repo.get_by_email(email)
 
@@ -60,12 +59,10 @@ class AuthService:
             blacklist_repo=self.blacklist_repo
         )
 
-        user_id = int(payload["sub"])
-        user = self.repo.get_by_id(user_id)
-
-        if not user:
-            logger.warning("User not found during refresh")
-            raise UserNotFoundError()
+        try:
+            user_id = int(payload["sub"])
+        except (KeyError, ValueError):
+            raise InvalidTokenError("Invalid subject")
 
         jti = payload.get("jti")
         if not jti:
@@ -74,7 +71,16 @@ class AuthService:
 
         expires_at = self._get_expires_at(payload)
 
+        if self.blacklist_repo.is_blacklisted(jti):
+            raise InvalidTokenError("Token already used")
+
         self.blacklist_repo.add(jti, expires_at)
+
+        user = self.repo.get_by_id(user_id)
+
+        if not user:
+            logger.warning("User not found during refresh")
+            raise UserNotFoundError()
 
         tokens = self._generate_tokens(user)
 
@@ -104,7 +110,8 @@ class AuthService:
             payload = decode_token(
                 token,
                 expected_type="access",
-                blacklist_repo=None)
+                blacklist_repo=None
+            )
         except InvalidTokenError:
             logger.warning("Logout with invalid token")
             return
@@ -114,9 +121,15 @@ class AuthService:
             logger.warning("Logout: missing jti")
             return
 
-        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        exp = payload.get("exp")
+        if not exp:
+            logger.warning("Logout: missing exp")
+            return
 
-        self.blacklist_repo.add(jti, expires_at)
+        expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+
+        if not self.blacklist_repo.is_blacklisted(jti):
+            self.blacklist_repo.add(jti, expires_at)
 
 
     # HELPERS
@@ -127,6 +140,11 @@ class AuthService:
             "access_token": create_access_token(payload),
             "refresh_token": create_refresh_token(payload)
         }
+
+    def _normalize_email(self, email: str) -> str:
+        if not email:
+            raise InvalidCredentialsError()
+        return email.strip().lower()
 
     def _build_auth_response(self, user: User, tokens: dict[str, str]) -> dict[str, str | int]:
         return {
@@ -148,4 +166,8 @@ class AuthService:
 
         if isinstance(exp, int):
             return datetime.fromtimestamp(exp, tz=timezone.utc)
-        return exp
+
+        if isinstance(exp, datetime):
+            return exp
+
+        raise InvalidTokenError("Invalid exp format")

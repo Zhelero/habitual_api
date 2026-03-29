@@ -42,12 +42,12 @@ def get_habits(
         user: User = Depends(get_current_user),
         service: HabitService = Depends(get_habit_service),
 ):
-    return service.get_habits_paginated(user.id, limit, offset)
+    return service.get_habits(user.id, limit, offset)
 
 # Get habit
 
 @router.get(
-    "/{habit_id}",
+    "/{habit_id}/",
     response_model=HabitResponse,
     summary="Get habit by id")
 def get_habit(
@@ -60,7 +60,7 @@ def get_habit(
 # Update
 
 @router.patch(
-    "/{habit_id}",
+    "/{habit_id}/",
     response_model=HabitResponse,
     summary="Update habit")
 def update_habit(
@@ -78,7 +78,7 @@ def update_habit(
 # Delete
 
 @router.delete(
-    "/{habit_id}",
+    "/{habit_id}/",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete habit"
 )
@@ -93,7 +93,7 @@ def delete_habit(
 # Mark done
 
 @router.post(
-    "/{habit_id}/done",
+    "/{habit_id}/done/",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Mark habit as done",
 )
@@ -108,7 +108,7 @@ def mark_done(
 # Undo mark done
 
 @router.delete(
-    "/{habit_id}/done",
+    "/{habit_id}/done/",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Undo habit completion",
 )
@@ -123,7 +123,7 @@ def undo_done(
 # Stats
 
 @router.get(
-    "/{habit_id}/stats",
+    "/{habit_id}/stats/",
     response_model=HabitStats,
     summary="Get habit statistics",
 )
@@ -137,7 +137,7 @@ def get_stats(
 # Heatmap
 
 @router.get(
-    "/{habit_id}/heatmap",
+    "/{habit_id}/heatmap/",
     response_model=list[HabitHeatmap],
     summary="Get habit heatmap (last 30 days)"
 )
