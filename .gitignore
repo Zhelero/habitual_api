@@ -1,0 +1,27 @@
+# Environment
+.env
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# Cache
+__pycache__/
+*.pyc
+
+# Tests artifacts
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+
+# Virtual environment
+.venv/
+venv/
+
+# Alembic
+alembic/versions/*.pyc
