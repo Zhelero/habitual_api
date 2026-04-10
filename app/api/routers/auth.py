@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, status, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, status
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.api.schemas import AuthRequest, AuthResponse, UserResponse, RefreshRequest, RegisterRequest
 from app.core.dependencies import get_auth_service, security, get_current_user

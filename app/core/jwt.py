@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
+
 import uuid
 
 from app.core.exceptions import InvalidTokenError, TokenRevokedError
@@ -44,7 +45,15 @@ def decode_token(
     if not token_type:
         raise InvalidTokenError("Missing token type")
 
-    jti = get_jti(payload)
+    if "exp" not in payload:
+        raise InvalidTokenError("Missing exp")
+
+    if expected_type and token_type != expected_type:
+        raise InvalidTokenError("Invalid token type")
+
+    jti = payload.get("jti")
+    if not jti:
+        raise InvalidTokenError("Missing JTI")
 
     if expected_type and token_type != expected_type:
         raise InvalidTokenError("Invalid token type")

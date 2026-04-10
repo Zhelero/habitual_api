@@ -28,11 +28,11 @@ class TokenBlacklistRepository:
             return False
 
         stmt = select(exists().where(TokenBlacklist.jti == jti))
-        return self.db.execute(stmt).scalar_one()
+        return bool(self.db.execute(stmt).scalar())
 
-    def delete_expired_tokens(self) -> int:
-        now = datetime.now(timezone.utc)
+    def delete_expired_tokens(self, now: datetime) -> int:
         stmt = delete(TokenBlacklist).where(TokenBlacklist.expires_at < now)
 
         result = self.db.execute(stmt)
+        self.db.flush()
         return result.rowcount

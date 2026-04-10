@@ -35,6 +35,14 @@ class NameCannotBeEmptyError(AppError):
     status_code = 400
     detail = "Name can not be empty"
 
+class HabitNameTooShortError(AppError):
+    status_code = 400
+    detail = "Habit name too short"
+
+class HabitNameTooLongError(AppError):
+    status_code = 400
+    detail = "Habit name too long"
+
 class UserAlreadyExistsError(AppError):
     status_code = 409
     detail = "User already exists"

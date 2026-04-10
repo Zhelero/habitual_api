@@ -1,9 +1,9 @@
-from datetime import date, timedelta
+from datetime import date, timezone, datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import Select
-from sqlalchemy import select, delete, func, case, update
+from sqlalchemy import select, delete, func, update, literal
 
 from app.db.models import Habit, HabitLog
 
@@ -95,14 +95,18 @@ class HabitRepository:
         if not habit:
             return None
 
-        log = HabitLog(habit_id=habit_id, date=log_date)
+        existing_stmt = select(HabitLog).where(
+            HabitLog.habit_id == habit_id,
+            HabitLog.date == log_date
+        )
 
-        self.db.add(log)
-        try:
-            self.db.flush()
-        except IntegrityError:
-            self.db.rollback()
+        existing = self.db.execute(existing_stmt).scalar_one_or_none()
+        if existing:
             return None
+
+        log = HabitLog(habit_id=habit_id, date=log_date)
+        self.db.add(log)
+        self.db.flush()
 
         return log
 
@@ -139,7 +143,7 @@ class HabitRepository:
             )
         )
 
-        return self.db.execute(stmt).scalar()
+        return self.db.execute(stmt).scalar() or 0
 
     def delete_log(self, user_id: int, habit_id: int, log_date: date):
         stmt = (
@@ -147,7 +151,7 @@ class HabitRepository:
             .where(
                 HabitLog.habit_id == habit_id,
                 HabitLog.date == log_date,
-                self._user_habit_filter(user_id)
+                self._user_habit_filter(user_id, habit_id)
             )
         )
 
@@ -157,65 +161,23 @@ class HabitRepository:
         return result.rowcount > 0
 
 
-    def get_stats(self, *, user_id: int, habit_id: int):
-        today = date.today()
-        week_ago = today - timedelta(days=6)
-        stmt = (
-            select(
-                func.count().label("total"),
-                func.coalesce(
-                    func.sum(
-                        case(
-                        (HabitLog.date >= week_ago, 1), else_=0)
-                    ),
-                    0
-                ).label("last7"),
-                (
-                    func.coalesce(
-                        func.sum(case(
-                            (HabitLog.date >= week_ago, 1), else_=0)),
-                            0
-                    ) * 100.0 / 7
-                ).label("completion_rate")
-            )
-            .where(
-                HabitLog.habit_id == habit_id,
-                self._user_habit_filter(user_id),
-            )
 
-        )
-
-        result = self.db.execute(stmt).one_or_none()
-
-        if not result:
-            return {
-                "total": 0,
-                "last7": 0,
-                "completion_rate": 0
-            }
-
-        total = result.total or 0
-        last7 = result.last7 or 0
-        completion_rate = round(result.completion_rate, 2)
-
-        return {
-            "total": total,
-            "last7": last7,
-            "completion_rate": completion_rate
-        }
 
     def get_heatmap(self, user_id: int, habit_id: int):
-        start = func.date(func.now(), "-29 days")
-        end = func.date(func.now())
+        habit = self.get_habit_by_id(user_id, habit_id)
+        if not habit:
+            return []
+
+        today = date.today()
+        start_date = today - timedelta(days=29)
 
         #recursive CTE
-        dates = select(start.label("date")).cte(name="dates", recursive=True)
-
+        dates = select(literal(start_date).label("date")).cte(name="dates", recursive=True)
         dates_alias = aliased(dates)
 
         dates = dates.union_all(
             select(func.date(dates_alias.c.date, "+1 day"))
-            .where(dates_alias.c.date < end)
+            .where(dates_alias.c.date < today)
         )
 
         stmt = (
@@ -236,18 +198,19 @@ class HabitRepository:
 
         return [
             {
-                "date": row.date,
+                "date": str(row.date),
                 "done": bool(row.done),
             }
             for row in result
         ]
 
     def count_completed_today(self, user_id: int):
+        today = datetime.now(timezone.utc).date()
         stmt = (
             select(func.count())
             .select_from(HabitLog)
             .where(
-                HabitLog.date == date.today(),
+                HabitLog.date == today,
                 self._user_habit_filter(user_id)
             )
         )

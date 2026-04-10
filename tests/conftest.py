@@ -2,10 +2,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from freezegun import freeze_time as _freeze_time
+from datetime import datetime
 
 from app.main import app
 from app.db.base import Base
 from app.db.deps import get_db
+from app.core.config import settings
+from tests.utils.helpers import build_service
 
 SQLALCHEMY_DATABASE_URI = "sqlite:///./test.db"
 
@@ -86,3 +90,17 @@ def mock_session(mocker):
     mock = mocker.Mock()
     mocker.patch("app.db.session.SessionLocal", return_value=mock)
     return mock
+
+@pytest.fixture
+def service(db):
+    return build_service(db)
+
+@pytest.fixture
+def freeze_time():
+    def _freeze(dt: datetime | str):
+        return _freeze_time(dt)
+    return _freeze
+
+@pytest.fixture
+def base_time():
+    return datetime(2026, 2, 1)

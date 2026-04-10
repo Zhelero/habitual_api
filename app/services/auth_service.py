@@ -11,7 +11,7 @@ from app.core.exceptions import (
     UserAlreadyExistsError,
     InvalidCredentialsError,
     UserNotFoundError,
-    InvalidTokenError,
+    InvalidTokenError, TokenRevokedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,13 @@ class AuthService:
 
     def register(self, email: str, password: str) -> dict[str, str | int]:
         email = self._normalize_email(email)
+
+        if not password or not password.strip():
+            raise InvalidCredentialsError()
+
+        if len(password.strip()) < 6:
+            raise InvalidCredentialsError()
+
         password_hash = hash_password(password)
 
         try:
@@ -34,7 +41,6 @@ class AuthService:
         except IntegrityError:
             logger.warning("User already exists: %s", email)
             raise UserAlreadyExistsError()
-
         tokens = self._generate_tokens(user)
 
         return self._build_auth_response(user, tokens)
@@ -72,7 +78,7 @@ class AuthService:
         expires_at = self._get_expires_at(payload)
 
         if self.blacklist_repo.is_blacklisted(jti):
-            raise InvalidTokenError("Token already used")
+            raise TokenRevokedError("Token already used")
 
         self.blacklist_repo.add(jti, expires_at)
 
@@ -109,7 +115,6 @@ class AuthService:
         try:
             payload = decode_token(
                 token,
-                expected_type="access",
                 blacklist_repo=None
             )
         except InvalidTokenError:
@@ -141,17 +146,17 @@ class AuthService:
             "refresh_token": create_refresh_token(payload)
         }
 
+    def _build_auth_response(self, user, tokens):
+        return {
+            **tokens,
+            "token_type": "bearer",
+            "user_id": user.id,
+        }
+
     def _normalize_email(self, email: str) -> str:
         if not email:
             raise InvalidCredentialsError()
         return email.strip().lower()
-
-    def _build_auth_response(self, user: User, tokens: dict[str, str]) -> dict[str, str | int]:
-        return {
-            **tokens,
-            "token_type": "bearer",
-            "user_id": user.id
-        }
 
     def _build_token_payload(self, user: User) -> dict[str, str]:
         return {

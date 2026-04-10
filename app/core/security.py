@@ -8,14 +8,16 @@ pwd_context = CryptContext(
     bcrypt__rounds=12,
 )
 
-def _normalize_password(password: str) -> bytes:
-    return hashlib.sha256(password.encode()).digest()
-
 def hash_password(password: str) -> str:
-    return pwd_context.hash(_normalize_password(password))
+    if not isinstance(password, str):
+        raise TypeError("Password must be a string")
+    return pwd_context.hash(password)
 
 def verify_password(password: str, hashed: str) -> bool:
+    if not isinstance(password, str):
+        return False
+
     try:
-        return pwd_context.verify(_normalize_password(password), hashed)
-    except UnknownHashError:
+        return pwd_context.verify(password, hashed)
+    except (UnknownHashError, ValueError):
         return False

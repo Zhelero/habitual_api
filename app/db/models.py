@@ -43,7 +43,7 @@ class Habit(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
     user: Mapped["User"] = relationship(back_populates="habits")
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -74,7 +74,7 @@ class HabitLog(Base):
 
     id: Mapped[int] = mapped_column( primary_key=True)
 
-    habit_id: Mapped[int] = mapped_column(ForeignKey('habits.id', ondelete="CASCADE"), nullable=    False)
+    habit_id: Mapped[int] = mapped_column(ForeignKey('habits.id', ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

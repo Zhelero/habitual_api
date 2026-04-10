@@ -102,10 +102,8 @@ class HabitHeatmap(BaseModel):
     date: date
     done: bool
 
-
 class HabitStats(BaseModel):
     current_streak: int
-    total_logs: int | None = None
     best_streak: int
     completion_last_7_days: float
     completion_last_30_days: float

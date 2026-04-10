@@ -9,7 +9,7 @@ from app.core.exceptions import (
     HabitAlreadyMarkedError,
     HabitAlreadyExistsError,
     HabitNotMarkedError,
-    NotFoundError,
+    NotFoundError, NameCannotBeEmptyError, HabitNameTooShortError, HabitNameTooLongError,
 )
 
 class HabitService:
@@ -19,6 +19,17 @@ class HabitService:
     # Create habit
 
     def create_habit(self, user_id: int, name: str, description: str | None) -> Habit:
+        name = name.strip()
+
+        if not name:
+            raise NameCannotBeEmptyError
+
+        if len(name) < 2:
+            raise HabitNameTooShortError
+
+        if len(name) > 100:
+            raise HabitNameTooLongError
+
         try:
             return self.repo.create_habit(user_id, name, description)
         except IntegrityError:
@@ -111,6 +122,9 @@ class HabitService:
         streak = 0
         current_day = today
 
+        if current_day not in log_dates:
+            current_day -= timedelta(days=1)
+
         while current_day in log_dates:
             streak += 1
             current_day -= timedelta(days=1)
@@ -132,8 +146,8 @@ class HabitService:
             today
         )
 
-        completion_last_7_days = round((count_7 / 7) * 100, 2) if count_7 else 0
-        completion_last_30_days = round((count_30 / 30) * 100, 2) if count_30 else 0
+        completion_last_7_days = (count_7 / 7) * 100 if count_7 else 0
+        completion_last_30_days = (count_30 / 30) * 100 if count_30 else 0
 
         last_7_days = [
             {

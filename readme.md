@@ -1,6 +1,7 @@
 # Habitual API
 
-> REST API for habit tracking — streaks, statistics, and progress visualization.
+> Production-ready REST API for habit tracking with JWT authentication, 
+streak analytics, and a scalable layered architecture.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square)
@@ -10,10 +11,25 @@
 
 ---
 
+## Why this project
+
+Habit tracking requires consistent state management and reliable statistics.
+
+This project focuses on:
+- correct streak calculation
+- data consistency across habit logs
+- secure authentication with token rotation and blacklist
+
+It also demonstrates how a test suite evolves alongside the application 
+and requires its own architecture.
+
+---
+
 ## Features
 
 - JWT authentication with token rotation and blacklist (logout support)
 - Full habit CRUD with user data isolation
+- Clear separation of concerns (Service / Repository architecture)
 - Mark habits as done / undo
 - Habit statistics — current streak, best streak, completion rate
 - Heatmap data for the last 30 days
@@ -33,6 +49,20 @@
 | Database | SQLite |
 | Testing | pytest, pytest-mock, TestClient |
 | Docs | Swagger UI / ReDoc (built-in) |
+
+---
+
+## Architecture
+
+The project follows a layered architecture:
+
+- API layer — request handling (FastAPI routers)
+- Service layer — business logic (streaks, stats, rules)
+- Repository layer — database interaction
+- Core layer — auth, security, configuration
+
+This separation allows independent testing of each layer 
+and keeps business logic isolated from the framework.
 
 ---
 
@@ -185,11 +215,20 @@ pytest
 ```
 
 Tests cover:
-- Auth flow (register, login, logout, refresh, token rotation)
-- JWT validation edge cases (missing fields, wrong type, blacklisted)
-- Habit CRUD and business rules (duplicate done → 409, undo without log → 409)
-- User data isolation (user A cannot access user B's habits)
-- Statistics and dashboard aggregation
+- 70+ automated tests
+- ~90% code coverage
+- Integration tests via FastAPI TestClient
+- Isolated test database per test
+
+The test suite verifies:
+- full authentication flow (register → login → refresh → logout)
+- token rotation and blacklist behavior
+- business rules (duplicate actions, invalid states)
+- user data isolation
+- statistics correctness
+
+The growing complexity of tests led to recognizing the need 
+for test architecture refactoring to support further scaling.
 
 ---
 
