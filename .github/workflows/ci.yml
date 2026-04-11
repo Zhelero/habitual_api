@@ -29,6 +29,7 @@ jobs:
       SECRET_KEY: test-secret
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       REFRESH_TOKEN_EXPIRE_DAYS: 7
+      PYTHONPATH: .
 
     steps:
       - name: Checkout
@@ -48,5 +49,4 @@ jobs:
           alembic upgrade head
 
       - name: Run tests
-        run: |
-          pytest --cov=app --cov-report=term-missing
+        run: pytest --cov=app --cov-report=term-missing
