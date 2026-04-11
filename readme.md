@@ -1,13 +1,14 @@
 # Habitual API
 
-> Production-ready REST API for habit tracking with JWT authentication, 
-streak analytics, and a scalable layered architecture.
+> Production-ready REST API for habit tracking
+with JWT auth, PostgreSQL, Alembic, and full CI pipeline.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-65%20passed-brightgreen?style=flat-square)
-![Coverage](https://img.shields.io/badge/coverage-~90%25-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-271%20passed-brightgreen?style=flat-square)
+![Coverage](https://img.shields.io/badge/coverage-~95%25-brightgreen?style=flat-square)
+![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -40,15 +41,17 @@ and requires its own architecture.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI |
-| ORM | SQLAlchemy 2.0 (Mapped / mapped_column) |
-| Validation | Pydantic v2 |
-| Auth | JWT (python-jose) + token blacklist |
-| Database | SQLite |
-| Testing | pytest, pytest-mock, TestClient |
-| Docs | Swagger UI / ReDoc (built-in) |
+| Layer      | Technology                              |
+|------------|-----------------------------------------|
+| Framework  | FastAPI                                 |
+| ORM        | SQLAlchemy 2.0 (Mapped / mapped_column) |
+| Validation | Pydantic v2                             |
+| Auth       | JWT (python-jose) + token blacklist     |
+| Database   | PostgreSQL                              |
+| Migrations | Alembic                                 |
+| CI         | GitHub Actions                          |
+| Testing    | pytest, pytest-mock, TestClient         |
+| Docs       | Swagger UI / ReDoc (built-in)           |
 
 ---
 
@@ -84,8 +87,8 @@ app/
     ├── security.py   # password hashing
     ├── jwt.py        # token creation & validation
     ├── exceptions.py # custom exceptions
-    ├── handlers.py   # exception handlers
-    └── middleware.py # request logging
+    └── handlers.py   # exception handlers
+
 ```
 
 ---
@@ -116,9 +119,13 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 DATABASE_URL=postgresql://user:password@localhost:5432/habitual
 ```
 
-See `.env.example` for reference.
+### 3. Run migrations
 
-### 3. Run
+```bash
+alembic upgrade head
+```
+
+### 4. Run server
 
 ```bash
 uvicorn app.main:app --reload
@@ -184,9 +191,8 @@ curl http://localhost:8000/habits/1/stats/ \
 {
   "current_streak": 5,
   "best_streak": 12,
-  "total_logs": 28,
-  "completion_last_7_days": 0.86,
-  "completion_last_30_days": 0.73,
+  "completion_last_7_days": 85.71,
+  "completion_last_30_days": 73.33,
   "last_7_days": [
     {"date": "2024-01-15", "done": true},
     {"date": "2024-01-14", "done": true}
@@ -201,8 +207,32 @@ curl -X POST http://localhost:8000/auth/refresh/ \
   -H "Content-Type: application/json" \
   -d '{"refresh_token": "eyJ..."}'
 ```
+---
+### Database
+
+The application uses PostgreSQL in production and SQLite for tests.
+
+Migrations are managed with Alembic:
+
+```bash
+alembic revision --autogenerate -m "message"
+alembic upgrade head
+```
 
 ---
+## CI
+
+GitHub Actions pipeline:
+
+- run PostgreSQL service
+- apply Alembic migrations
+- run pytest
+- generate coverage
+
+Runs on:
+- push
+- pull request
+
 
 ## Testing
 
@@ -211,14 +241,20 @@ pytest
 ```
 
 ```
-65 passed in 3.42s
+271 passed in 81.42s
 ```
 
-Tests cover:
-- 70+ automated tests
-- ~90% code coverage
-- Integration tests via FastAPI TestClient
-- Isolated test database per test
+Tests include:
+
+- API tests
+- service layer tests
+- repository tests
+- auth flow tests
+- database transaction tests
+- JWT tests
+- middleware tests
+
+Coverage: ~95%
 
 The test suite verifies:
 - full authentication flow (register → login → refresh → logout)
