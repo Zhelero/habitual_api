@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     DATABASE_URL: str
+    DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/habitual"
+
 
     model_config = ConfigDict(
         env_file = ".env",

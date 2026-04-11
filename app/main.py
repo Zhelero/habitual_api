@@ -46,5 +46,3 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
-Base.metadata.create_all(bind=engine)
