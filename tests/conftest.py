@@ -11,11 +11,11 @@ from app.db.deps import get_db
 from app.core.config import settings
 from tests.utils.helpers import build_service
 
-SQLALCHEMY_DATABASE_URI = "sqlite:///./test.db"
+SQLALCHEMY_DATABASE_URI = "postgresql+psycopg://postgres:postgres@localhost:5432/habitual_test"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URI,
-    connect_args={"check_same_thread": False},
+    pool_pre_ping=True
 )
 TestingSessionLocal = sessionmaker(
     bind=engine,

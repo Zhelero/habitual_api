@@ -292,3 +292,7 @@ class TestLogout:
 
         assert response.status_code in (204, 401)
 
+    def test_logout_empty_token(self, client):
+        response = client.post("/auth/logout/", headers={})
+
+        assert response.status_code == 204

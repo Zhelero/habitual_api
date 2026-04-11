@@ -1,11 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "sqlite:///habitual.db"
+from app.core.config import settings
 
+#DATABASE_URL = "sqlite:///habitual.db"
+DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/habitual"
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    pool_pre_ping=True
 )
 
 SessionLocal = sessionmaker(

@@ -1,9 +1,8 @@
 from datetime import date, timezone, datetime, timedelta
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import Select
-from sqlalchemy import select, delete, func, update, literal
+from sqlalchemy import select, delete, func, update, literal, cast, Date
 
 from app.db.models import Habit, HabitLog
 
@@ -176,8 +175,9 @@ class HabitRepository:
         dates_alias = aliased(dates)
 
         dates = dates.union_all(
-            select(func.date(dates_alias.c.date, "+1 day"))
-            .where(dates_alias.c.date < today)
+            select(
+                cast(dates_alias.c.date + timedelta(days=1), Date),
+            ).where(dates_alias.c.date < today)
         )
 
         stmt = (

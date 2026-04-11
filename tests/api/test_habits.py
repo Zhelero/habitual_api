@@ -26,6 +26,13 @@ class TestCreateHabit:
 
         assert response.status_code in (400, 422)
 
+    def test_create_space_name(self, client, auth_headers):
+        response = client.post("/habits/", json={
+            "name": "      ",
+        }, headers=auth_headers)
+
+        assert response.status_code == 400
+
     def test_create_habit_long_name(self, client, auth_headers):
         response = client.post("/habits/", json={
             "name": "a" * 260
@@ -170,6 +177,15 @@ class TestUpdateHabit:
 
         assert response.status_code == 422
 
+    def test_update_space_name(self, client, auth_headers):
+        habit_id = get_habit_id(client, auth_headers)
+
+        response = client.patch(f"/habits/{habit_id}", json={
+            "name": "      ",
+        }, headers=auth_headers)
+
+        assert response.status_code == 400
+
     def test_update_nonexistent_habit(self, client, auth_headers):
         response = client.patch("/habits/123/", json={
             "name": "test"
@@ -186,6 +202,13 @@ class TestUpdateHabit:
         })
 
         assert response.status_code == 401
+
+    def test_update_habit_empty_json(self, client, auth_headers):
+        habit_id = get_habit_id(client, auth_headers)
+
+        response = client.patch(f"/habits/{habit_id}/", json={}, headers=auth_headers)
+
+        assert response.status_code == 400
 
 
 class TestDeleteHabit:
