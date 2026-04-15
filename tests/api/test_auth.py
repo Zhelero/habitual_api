@@ -6,6 +6,7 @@ from tests.utils.helpers import random_email, register_user, get_auth_headers
 
 DEFAULT_PASSWORD = "123456"
 
+
 class TestRegister:
 
     def test_register_success(self, client):
@@ -23,44 +24,38 @@ class TestRegister:
 
         data = register_user(client, email, DEFAULT_PASSWORD)
 
-        me = client.get("/auth/me/", headers= {
-            "Authorization": f"Bearer {data['access_token']}"
-        })
+        me = client.get(
+            "/auth/me/", headers={"Authorization": f"Bearer {data['access_token']}"}
+        )
         assert me.json()["email"] == email.lower()
 
     def test_register_duplicate(self, client):
         email = random_email()
-        payload = {
-            "email": email,
-            "password": DEFAULT_PASSWORD
-        }
+        payload = {"email": email, "password": DEFAULT_PASSWORD}
         client.post("/auth/register/", json=payload)
         response = client.post("/auth/register/", json=payload)
 
         assert response.status_code == 409
 
     def test_register_empty_email(self, client):
-        response = client.post("/auth/register/", json={
-            "email": "",
-            "password": DEFAULT_PASSWORD
-        })
+        response = client.post(
+            "/auth/register/", json={"email": "", "password": DEFAULT_PASSWORD}
+        )
 
         assert response.status_code == 422
 
     @pytest.mark.parametrize("password", ["", "123", " "])
     def test_register_invalid_password(self, client, password):
-        response = client.post("/auth/register/", json={
-            "email": random_email(),
-            "password": password
-        })
+        response = client.post(
+            "/auth/register/", json={"email": random_email(), "password": password}
+        )
 
         assert response.status_code == 422
 
     def test_register_short_password(self, client):
-        response = client.post("/auth/register/", json={
-            "email": random_email(),
-            "password": "12345"
-        })
+        response = client.post(
+            "/auth/register/", json={"email": random_email(), "password": "12345"}
+        )
 
         assert response.status_code == 422
 
@@ -74,10 +69,9 @@ class TestLogin:
         email = random_email()
         register_user(client, email, DEFAULT_PASSWORD)
 
-        response = client.post("/auth/login/", json={
-            "email": email,
-            "password": DEFAULT_PASSWORD
-        })
+        response = client.post(
+            "/auth/login/", json={"email": email, "password": DEFAULT_PASSWORD}
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -92,18 +86,16 @@ class TestLogin:
 
         register_user(client, email, DEFAULT_PASSWORD)
 
-        response = client.post("/auth/login/", json={
-            "email": email,
-            "password": "wrong123"
-        })
+        response = client.post(
+            "/auth/login/", json={"email": email, "password": "wrong123"}
+        )
 
         assert response.status_code == 401
 
     def test_login_invalid_credentials(self, client):
-        response =client.post("/auth/login/", json={
-            "email": random_email(),
-            "password": DEFAULT_PASSWORD
-        })
+        response = client.post(
+            "/auth/login/", json={"email": random_email(), "password": DEFAULT_PASSWORD}
+        )
 
         assert response.status_code == 401
 
@@ -139,9 +131,9 @@ class TestMe:
         assert response.status_code == 401
 
     def test_me_with_invalid_token(self, client):
-        response = client.get("/auth/me/", headers={
-            "Authorization": "Bearer invalid_token"
-        })
+        response = client.get(
+            "/auth/me/", headers={"Authorization": "Bearer invalid_token"}
+        )
 
         assert response.status_code == 401
 
@@ -151,20 +143,17 @@ class TestMe:
         user_id = user["user_id"]
         token = user["access_token"]
 
-        me = client.get("/auth/me/", headers={
-            "Authorization": f"Bearer {token}"
-        })
+        me = client.get("/auth/me/", headers={"Authorization": f"Bearer {token}"})
 
         assert me.json()["id"] == user_id
+
 
 class TestRefresh:
     def test_refresh_success(self, client):
         user = register_user(client)
         old_refresh = user["refresh_token"]
 
-        response2 = client.post("/auth/refresh/", json={
-            "refresh_token": old_refresh
-        })
+        response2 = client.post("/auth/refresh/", json={"refresh_token": old_refresh})
 
         new_refresh = response2.json()["refresh_token"]
 
@@ -185,18 +174,14 @@ class TestRefresh:
 
         refresh_token = user["refresh_token"]
 
-        #first refresh
-        res2 = client.post("/auth/refresh/", json={
-            "refresh_token": refresh_token
-        })
+        # first refresh
+        res2 = client.post("/auth/refresh/", json={"refresh_token": refresh_token})
 
         assert res2.status_code == 200
         new_refresh = res2.json()["refresh_token"]
 
         # second refresh with new token
-        res3 = client.post("/auth/refresh/", json={
-            "refresh_token": new_refresh
-        })
+        res3 = client.post("/auth/refresh/", json={"refresh_token": new_refresh})
 
         assert res3.status_code == 200
 
@@ -204,29 +189,28 @@ class TestRefresh:
         user = register_user(client)
         refresh_token = user["refresh_token"]
 
-        client.post("/auth/refresh/", json={
-            "refresh_token": refresh_token
-        })
+        client.post("/auth/refresh/", json={"refresh_token": refresh_token})
 
-        response = client.post("/auth/refresh/", json={
-            "refresh_token": refresh_token
-        })
+        response = client.post("/auth/refresh/", json={"refresh_token": refresh_token})
 
         assert response.status_code == 401
 
     def test_refresh_invalid_token(self, client):
-        res = client.post("/auth/refresh/", json={
-            "refresh_token": "invalid_token",
-        })
+        res = client.post(
+            "/auth/refresh/",
+            json={
+                "refresh_token": "invalid_token",
+            },
+        )
 
         assert res.status_code == 401
 
     def test_refresh_with_access_token(self, client):
         user = register_user(client)
 
-        response = client.post("/auth/refresh/", json={
-            "refresh_token": user["access_token"]
-        })
+        response = client.post(
+            "/auth/refresh/", json={"refresh_token": user["access_token"]}
+        )
 
         assert response.status_code == 401
 
@@ -236,31 +220,30 @@ class TestRefresh:
 
         register_user(client, email, DEFAULT_PASSWORD)
         with freeze_time(now - timedelta(days=8)):
-            response = client.post("/auth/login/", json={
-                "email": email,
-                "password": DEFAULT_PASSWORD
-            })
+            response = client.post(
+                "/auth/login/", json={"email": email, "password": DEFAULT_PASSWORD}
+            )
 
             refresh_token = response.json()["refresh_token"]
             assert response.status_code == 200
 
         with freeze_time(now):
-            response = client.post("/auth/refresh/", json={
-                "refresh_token": refresh_token
-            })
+            response = client.post(
+                "/auth/refresh/", json={"refresh_token": refresh_token}
+            )
 
         assert response.status_code == 401
 
     def test_refresh_after_logout(self, client):
         user = register_user(client)
 
-        client.post("/auth/logout/", headers={
-            "Authorization": f"Bearer {user['access_token']}"
-        })
+        client.post(
+            "/auth/logout/", headers={"Authorization": f"Bearer {user['access_token']}"}
+        )
 
-        response = client.post("/auth/refresh/", json={
-            "refresh_token": user["refresh_token"]
-        })
+        response = client.post(
+            "/auth/refresh/", json={"refresh_token": user["refresh_token"]}
+        )
 
         assert response.status_code in (200, 401)
 
@@ -286,9 +269,9 @@ class TestLogout:
         assert response.status_code in (204, 401)
 
     def test_logout_invalid_token(self, client):
-        response = client.post("/auth/logout/", headers={
-            "Authorization": "Bearer invalid_token"
-        })
+        response = client.post(
+            "/auth/logout/", headers={"Authorization": "Bearer invalid_token"}
+        )
 
         assert response.status_code in (204, 401)
 

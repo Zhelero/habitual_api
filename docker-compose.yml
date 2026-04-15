@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: habitual
+      POSTGRES_PASSWORD: habitual
+      POSTGRES_DB: habitual
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U habitual"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runtime
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://habitual:habitual@db:5432/habitual
+      SECRET_KEY: dev_secret
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+
+  test:
+    profiles: [ "test" ]
+    build:
+      context: .
+      target: dev
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://habitual:habitual@db:5432/habitual
+      SECRET_KEY: test-secret
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      PYTHONPATH: /app
+    command: pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+    
+
+volumes:
+  postgres_data:

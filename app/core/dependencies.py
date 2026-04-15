@@ -21,51 +21,57 @@ USER_NOT_FOUND = "User not found"
 
 # REPOSITORIES
 
+
 def get_user_repository(
-        db: Session = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> UserRepository:
     return UserRepository(db)
 
+
 def get_habit_repository(
-        db: Session = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> HabitRepository:
     return HabitRepository(db)
 
 
 # TOKEN BLACKLIST
 
+
 def get_blacklist_repository(
-        db: Session = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> TokenBlacklistRepository:
     return TokenBlacklistRepository(db)
 
 
 # SERVICES
 
+
 def get_auth_service(
-        repo: UserRepository = Depends(get_user_repository),
-        blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
+    repo: UserRepository = Depends(get_user_repository),
+    blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
 ) -> AuthService:
     return AuthService(repo, blacklist_repo)
 
+
 def get_habit_service(
-        repo: HabitRepository = Depends(get_habit_repository),
+    repo: HabitRepository = Depends(get_habit_repository),
 ) -> HabitService:
     return HabitService(repo)
 
 
 def get_dashboard_service(
-        repo: HabitRepository = Depends(get_habit_repository),
+    repo: HabitRepository = Depends(get_habit_repository),
 ) -> DashboardService:
     return DashboardService(repo)
 
 
 # AUTH
 
+
 def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security),
-        repo: UserRepository = Depends(get_user_repository),
-        blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    repo: UserRepository = Depends(get_user_repository),
+    blacklist_repo: TokenBlacklistRepository = Depends(get_blacklist_repository),
 ) -> User:
 
     if not credentials:
@@ -75,9 +81,7 @@ def get_current_user(
 
     try:
         payload = decode_token(
-            token,
-            expected_type="access",
-            blacklist_repo=blacklist_repo
+            token, expected_type="access", blacklist_repo=blacklist_repo
         )
     except InvalidTokenError:
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)

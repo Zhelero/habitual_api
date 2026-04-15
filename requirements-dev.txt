@@ -1,0 +1,4 @@
+-r requirements-test.txt
+
+black==24.4.2
+ruff==0.15.10

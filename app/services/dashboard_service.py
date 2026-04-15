@@ -3,6 +3,7 @@ from datetime import date
 from app.repositories.habit_repository import HabitRepository
 from app.services.helpers import calculate_best_streak
 
+
 class DashboardService:
     def __init__(self, repo: HabitRepository):
         self.repo = repo

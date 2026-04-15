@@ -1,5 +1,5 @@
-from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     SECRET_KEY: str
@@ -9,13 +9,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     DATABASE_URL: str
-    DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/habitual"
 
-
-    model_config = ConfigDict(
-        env_file = ".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", case_sensitive=True
     )
+
 
 settings = Settings()

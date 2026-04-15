@@ -3,9 +3,6 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db import models
-from app.db.base import Base
-from app.db.session import engine
 from app.api.routers import habits, dashboard, auth
 from app.core.exceptions import AppError
 from app.core.handlers import app_error_handler
@@ -18,7 +15,7 @@ logging.basicConfig(
 
 app = FastAPI(title="Habitual API")
 
-#CORS
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,6 +39,7 @@ def root():
         "status": "ok",
         "service": "Habitual API",
     }
+
 
 @app.get("/health")
 def health():

@@ -1,4 +1,11 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, field_validator, constr
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    model_validator,
+    field_validator,
+)
 from datetime import datetime, date
 from typing import Literal
 
@@ -10,11 +17,13 @@ class AuthRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: Literal["bearer"]
     user_id: int
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -31,17 +40,20 @@ class RegisterRequest(BaseModel):
 
         return v
 
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(
         min_length=1,
         description="JWT refresh token",
     )
 
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class HabitCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -98,9 +110,11 @@ class HabitUpdate(BaseModel):
     def validate_description(cls, value: str | None):
         return normalize_str(value)
 
+
 class HabitHeatmap(BaseModel):
     date: date
     done: bool
+
 
 class HabitStats(BaseModel):
     current_streak: int
@@ -109,10 +123,12 @@ class HabitStats(BaseModel):
     completion_last_30_days: float
     last_7_days: list[HabitHeatmap]
 
+
 class DashboardStats(BaseModel):
     total_habits: int
     completed_today: int
     best_streak: int
+
 
 class PaginatedHabits(BaseModel):
     items: list[HabitResponse]

@@ -1,0 +1,16 @@
+services:
+  app:
+    volumes:
+      - .:/app
+    command: >
+      sh -c "
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  test:
+    volumes:
+      - .:/app
+    environment:
+      PYTHONUNBUFFERED: 1
+    command: pytest -q

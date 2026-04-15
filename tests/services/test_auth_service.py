@@ -6,11 +6,17 @@ from jose import jwt
 
 from app.core.config import settings
 from app.core.jwt import decode_token, create_access_token
-from app.core.exceptions import InvalidCredentialsError, TokenRevokedError, UserAlreadyExistsError, InvalidTokenError, \
-    UserNotFoundError
+from app.core.exceptions import (
+    InvalidCredentialsError,
+    TokenRevokedError,
+    UserAlreadyExistsError,
+    InvalidTokenError,
+    UserNotFoundError,
+)
 from tests.utils.helpers import random_email
 
 DEFAULT_PASSWORD = "123456"
+
 
 class TestRegister:
     def test_register_success(self, service):
@@ -271,7 +277,7 @@ class TestLogout:
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
-        #logout should be idempotent and not crash
+        # logout should be idempotent and not crash
         service.logout(broken)
 
     def test_logout_missing_exp(self, service):
@@ -294,7 +300,9 @@ class TestLogout:
     def test_logout_invalid_refresh_token(self, service):
         service.logout("invalid_refresh_token")
 
-#HELPER
+
+# HELPER
+
 
 def _create_user_and_login(service):
     email = random_email()

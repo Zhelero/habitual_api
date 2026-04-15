@@ -1,8 +1,15 @@
 import pytest
 from datetime import timedelta, date
 
-from app.core.exceptions import HabitAlreadyMarkedError, NameCannotBeEmptyError, HabitAlreadyExistsError, \
-    HabitNameTooLongError, HabitNameTooShortError, NotFoundError, HabitNotMarkedError
+from app.core.exceptions import (
+    HabitAlreadyMarkedError,
+    NameCannotBeEmptyError,
+    HabitAlreadyExistsError,
+    HabitNameTooLongError,
+    HabitNameTooShortError,
+    NotFoundError,
+    HabitNotMarkedError,
+)
 from app.services.habit_service import HabitService
 from app.repositories.habit_repository import HabitRepository
 from app.repositories.user_repository import UserRepository
@@ -13,17 +20,22 @@ from tests.utils.helpers import random_habit_name, random_email
 def user(db):
     repo = UserRepository(db)
     from app.core.security import hash_password
+
     return repo.create_user(random_email(), hash_password("123456"))
+
 
 @pytest.fixture
 def other_user(db):
     repo = UserRepository(db)
     from app.core.security import hash_password
+
     return repo.create_user(random_email(), hash_password("123456"))
+
 
 @pytest.fixture
 def habit_service(db):
     return HabitService(HabitRepository(db))
+
 
 @pytest.fixture
 def habit(habit_service, user):
@@ -69,6 +81,7 @@ class TestCreateHabit:
 
         assert h1.id != h2.id
 
+
 class TestGetHabit:
     def test_returns_habit(self, habit_service, user, habit):
         result = habit_service.get_habit(user.id, habit.id)
@@ -82,6 +95,7 @@ class TestGetHabit:
     def test_missing_id_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
             habit_service.get_habit(user.id, 123)
+
 
 class TestGetHabits:
     def test_get_habit(self, user, habit_service):
@@ -118,12 +132,16 @@ class TestUpdateHabit:
         assert updated.name == "New name"
 
     def test_updates_description(self, habit_service, user, habit):
-        updated = habit_service.update_habit(user.id, habit.id, {"description": "New description"})
+        updated = habit_service.update_habit(
+            user.id, habit.id, {"description": "New description"}
+        )
 
         assert updated.description == "New description"
 
     def test_ignores_unknown_fields(self, habit_service, user, habit):
-        updated = habit_service.update_habit(user.id, habit.id, {"name": "Valid", "hacked": True})
+        updated = habit_service.update_habit(
+            user.id, habit.id, {"name": "Valid", "hacked": True}
+        )
 
         assert updated.name == "Valid"
 
@@ -132,7 +150,7 @@ class TestUpdateHabit:
         habit = habit_service.create_habit(user.id, "BCD", None)
 
         with pytest.raises(HabitAlreadyExistsError):
-            habit_service.update_habit(user.id, habit.id, {"name":"ABC"})
+            habit_service.update_habit(user.id, habit.id, {"name": "ABC"})
 
     def test_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
@@ -157,6 +175,7 @@ class TestDeleteHabit:
     def test_missing_habit_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
             habit_service.delete_habit(user.id, 123)
+
 
 class TestMarkDone:
     def test_marks_done_creates_log(self, habit_service, user, habit):
@@ -215,7 +234,9 @@ class TestGetStats:
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 1
 
-    def test_current_streak_consecutive_days(self, habit_service, user, habit, freeze_time, base_time):
+    def test_current_streak_consecutive_days(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         for i in range(3):
             with freeze_time(base_time - timedelta(days=2 - i)):
                 habit_service.mark_done(user.id, habit.id)
@@ -226,7 +247,9 @@ class TestGetStats:
         assert stats["current_streak"] == 3
         assert stats["best_streak"] == 3
 
-    def test_streak_broken_by_gap(self, habit_service, user, habit, freeze_time, base_time):
+    def test_streak_broken_by_gap(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         with freeze_time(base_time - timedelta(days=3)):
             habit_service.mark_done(user.id, habit.id)
         with freeze_time(base_time - timedelta(days=2)):
@@ -246,7 +269,9 @@ class TestGetStats:
 
         assert stats["completion_last_30_days"] == pytest.approx(1 / 30 * 100)
 
-    def test_completion_excludes_out_of_window(self, habit_service, user, habit, freeze_time, base_time):
+    def test_completion_excludes_out_of_window(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         with freeze_time(base_time - timedelta(days=7)):
             habit_service.mark_done(user.id, habit.id)
         with freeze_time(base_time - timedelta(days=6)):
@@ -255,9 +280,11 @@ class TestGetStats:
         with freeze_time(base_time):
             stats = habit_service.get_stats(user.id, habit.id)
 
-        assert  stats["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
+        assert stats["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
 
-    def test_last_7_days_correct_dates(self, habit_service, user, habit, freeze_time, base_time):
+    def test_last_7_days_correct_dates(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         with freeze_time(base_time):
             stats = habit_service.get_stats(user.id, habit.id)
 
@@ -266,7 +293,9 @@ class TestGetStats:
 
         assert dates == expected
 
-    def test_last_7_days_done_flag(self, habit_service, user, habit, freeze_time, base_time):
+    def test_last_7_days_done_flag(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         with freeze_time(base_time):
             habit_service.mark_done(user.id, habit.id)
             stats = habit_service.get_stats(user.id, habit.id)
@@ -297,7 +326,9 @@ class TestGetHeatmap:
 
         assert len(result) == 30
 
-    def test_logged_day_is_done(self, habit_service, user, habit, freeze_time, base_time):
+    def test_logged_day_is_done(
+        self, habit_service, user, habit, freeze_time, base_time
+    ):
         today = date.today().isoformat()
         habit_service.mark_done(user.id, habit.id)
         result = habit_service.get_heatmap(user.id, habit.id)

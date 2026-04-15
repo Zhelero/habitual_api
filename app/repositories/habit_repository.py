@@ -6,6 +6,7 @@ from sqlalchemy import select, delete, func, update, literal, cast, Date
 
 from app.db.models import Habit, HabitLog
 
+
 class HabitRepository:
     def __init__(self, db: Session):
         self.db = db
@@ -13,10 +14,7 @@ class HabitRepository:
     # Habits
 
     def create_habit(self, user_id: int, name: str, description: str | None) -> Habit:
-        habit = Habit(
-            user_id=user_id,
-            name=name,
-            description=description)
+        habit = Habit(user_id=user_id, name=name, description=description)
 
         self.db.add(habit)
         self.db.flush()
@@ -27,10 +25,7 @@ class HabitRepository:
     def update_habit(self, user_id: int, habit_id: int, data: dict) -> Habit | None:
         stmt = (
             update(Habit)
-            .where(
-                Habit.id == habit_id,
-                Habit.user_id == user_id
-            )
+            .where(Habit.id == habit_id, Habit.user_id == user_id)
             .values(**data)
             .returning(Habit)
         )
@@ -43,7 +38,11 @@ class HabitRepository:
         return updated
 
     def get_all_habits(self, user_id: int) -> list[Habit]:
-        stmt = select(Habit).where(Habit.user_id == user_id).order_by(Habit.created_at.desc())
+        stmt = (
+            select(Habit)
+            .where(Habit.user_id == user_id)
+            .order_by(Habit.created_at.desc())
+        )
         result = self.db.execute(stmt)
 
         return result.scalars().all()
@@ -57,13 +56,10 @@ class HabitRepository:
 
         return result.scalar_one_or_none()
 
-    def get_habits_paginated(self, user_id: int, limit: int, offset: int) -> list[Habit]:
-        stmt = (
-            select(Habit)
-            .where(Habit.user_id == user_id)
-            .offset(offset)
-            .limit(limit)
-        )
+    def get_habits_paginated(
+        self, user_id: int, limit: int, offset: int
+    ) -> list[Habit]:
+        stmt = select(Habit).where(Habit.user_id == user_id).offset(offset).limit(limit)
 
         return self.db.execute(stmt).scalars().all()
 
@@ -72,31 +68,23 @@ class HabitRepository:
         return self.db.execute(stmt).scalar()
 
     def delete_habit(self, user_id: int, habit_id: int) -> bool:
-        stmt = delete(Habit).where(
-            Habit.id == habit_id,
-            Habit.user_id == user_id
-        )
+        stmt = delete(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
         result = self.db.execute(stmt)
         self.db.flush()
 
         return result.rowcount > 0
 
-
     # LOGS
 
     def add_log(self, user_id: int, habit_id: int, log_date: date) -> HabitLog | None:
-        stmt = select(Habit).where(
-            Habit.id == habit_id,
-            Habit.user_id == user_id
-        )
+        stmt = select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
         habit = self.db.execute(stmt).scalar_one_or_none()
 
         if not habit:
             return None
 
         existing_stmt = select(HabitLog).where(
-            HabitLog.habit_id == habit_id,
-            HabitLog.date == log_date
+            HabitLog.habit_id == habit_id, HabitLog.date == log_date
         )
 
         existing = self.db.execute(existing_stmt).scalar_one_or_none()
@@ -112,10 +100,7 @@ class HabitRepository:
     def get_logs_by_habit(self, user_id: int, habit_id: int) -> list[HabitLog]:
         stmt = (
             select(HabitLog)
-            .where(
-                HabitLog.habit_id == habit_id,
-                self._user_habit_filter(user_id)
-            )
+            .where(HabitLog.habit_id == habit_id, self._user_habit_filter(user_id))
             .order_by(HabitLog.date.desc())
         )
         result = self.db.execute(stmt)
@@ -126,7 +111,8 @@ class HabitRepository:
         stmt = (
             select(HabitLog)
             .where(self._user_habit_filter(user_id))
-            .order_by(HabitLog.date))
+            .order_by(HabitLog.date)
+        )
 
         return self.db.execute(stmt).scalars().all()
 
@@ -138,29 +124,23 @@ class HabitRepository:
                 HabitLog.habit_id == habit_id,
                 self._user_habit_filter(user_id),
                 HabitLog.date >= start,
-                HabitLog.date <= end
+                HabitLog.date <= end,
             )
         )
 
         return self.db.execute(stmt).scalar() or 0
 
     def delete_log(self, user_id: int, habit_id: int, log_date: date):
-        stmt = (
-            delete(HabitLog)
-            .where(
-                HabitLog.habit_id == habit_id,
-                HabitLog.date == log_date,
-                self._user_habit_filter(user_id, habit_id)
-            )
+        stmt = delete(HabitLog).where(
+            HabitLog.habit_id == habit_id,
+            HabitLog.date == log_date,
+            self._user_habit_filter(user_id, habit_id),
         )
 
         result = self.db.execute(stmt)
         self.db.flush()
 
         return result.rowcount > 0
-
-
-
 
     def get_heatmap(self, user_id: int, habit_id: int):
         habit = self.get_habit_by_id(user_id, habit_id)
@@ -170,8 +150,10 @@ class HabitRepository:
         today = date.today()
         start_date = today - timedelta(days=29)
 
-        #recursive CTE
-        dates = select(literal(start_date).label("date")).cte(name="dates", recursive=True)
+        # recursive CTE
+        dates = select(literal(start_date).label("date")).cte(
+            name="dates", recursive=True
+        )
         dates_alias = aliased(dates)
 
         dates = dates.union_all(
@@ -181,15 +163,11 @@ class HabitRepository:
         )
 
         stmt = (
-            select(
-                dates.c.date,
-                (HabitLog.id.is_not(None)).label("done")
-            )
+            select(dates.c.date, (HabitLog.id.is_not(None)).label("done"))
             .select_from(dates)
             .outerjoin(
                 HabitLog,
-                (HabitLog.date == dates.c.date) &
-                (HabitLog.habit_id == habit_id)
+                (HabitLog.date == dates.c.date) & (HabitLog.habit_id == habit_id),
             )
             .order_by(dates.c.date)
         )
@@ -209,16 +187,13 @@ class HabitRepository:
         stmt = (
             select(func.count())
             .select_from(HabitLog)
-            .where(
-                HabitLog.date == today,
-                self._user_habit_filter(user_id)
-            )
+            .where(HabitLog.date == today, self._user_habit_filter(user_id))
         )
 
         return self.db.execute(stmt).scalar()
-    
+
     # HELPERS
-    
+
     def _habit_subquery(self, user_id: int) -> Select:
         return select(Habit.id).where(Habit.user_id == user_id)
 

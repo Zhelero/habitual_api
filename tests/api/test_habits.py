@@ -1,16 +1,23 @@
 import pytest
 
 from tests.services.test_auth_service import DEFAULT_PASSWORD
-from tests.utils.helpers import create_habit, random_habit_name, register_user, get_auth_headers, random_email
+from tests.utils.helpers import (
+    create_habit,
+    random_habit_name,
+    register_user,
+    get_auth_headers,
+    random_email,
+)
 from datetime import timedelta
 
 
 class TestCreateHabit:
     def test_create_habit(self, client, auth_headers):
-        response = client.post("/habits/", json={
-            "name": random_habit_name(),
-            "description": "Test habit"
-        }, headers=auth_headers)
+        response = client.post(
+            "/habits/",
+            json={"name": random_habit_name(), "description": "Test habit"},
+            headers=auth_headers,
+        )
 
         assert response.status_code == 201
         data = response.json()
@@ -20,44 +27,44 @@ class TestCreateHabit:
         assert isinstance(data["description"], str)
 
     def test_create_habit_empty_name(self, client, auth_headers):
-        response = client.post("/habits/", json={
-            "name": ""
-        }, headers=auth_headers)
+        response = client.post("/habits/", json={"name": ""}, headers=auth_headers)
 
         assert response.status_code in (400, 422)
 
     def test_create_space_name(self, client, auth_headers):
-        response = client.post("/habits/", json={
-            "name": "      ",
-        }, headers=auth_headers)
+        response = client.post(
+            "/habits/",
+            json={
+                "name": "      ",
+            },
+            headers=auth_headers,
+        )
 
         assert response.status_code == 400
 
     def test_create_habit_long_name(self, client, auth_headers):
-        response = client.post("/habits/", json={
-            "name": "a" * 260
-        }, headers=auth_headers)
+        response = client.post(
+            "/habits/", json={"name": "a" * 260}, headers=auth_headers
+        )
 
         assert response.status_code == 422
 
     def test_create_habit_duplicate_name(self, client, auth_headers):
         name = random_habit_name()
-        client.post("/habits/", json={
-            "name": name
-        }, headers=auth_headers)
+        client.post("/habits/", json={"name": name}, headers=auth_headers)
 
-        response = client.post("/habits/", json={
-            "name": name
-        }, headers=auth_headers)
+        response = client.post("/habits/", json={"name": name}, headers=auth_headers)
 
         assert response.status_code == 409
 
     def test_create_habit_invalid_token(self, client, auth_headers):
-        response = client.post("/habits/", json={
-            "name": random_habit_name(),
-        }, headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.post(
+            "/habits/",
+            json={
+                "name": random_habit_name(),
+            },
+            headers={"Authorization": "wrong_token"},
+        )
 
         assert response.status_code == 401
 
@@ -104,9 +111,7 @@ class TestGetHabits:
         assert response.status_code == 401
 
     def test_get_habits_invalid_token(self, client):
-        response = client.get("/habits/", headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.get("/habits/", headers={"Authorization": "wrong_token"})
         assert response.status_code == 401
 
     def test_get_habits_blacklisted_token(self, client):
@@ -119,23 +124,27 @@ class TestGetHabits:
         assert response.status_code == 401
 
     def test_user_cannot_access_other_user_habit(self, client):
-        #user1
+        # user1
         user1 = register_user(client)
 
         token1 = user1["access_token"]
 
-        #user1 creates habit
-        response = client.post("/habits/", json={
-            "name": random_habit_name(),
-        }, headers=auth(token1))
+        # user1 creates habit
+        response = client.post(
+            "/habits/",
+            json={
+                "name": random_habit_name(),
+            },
+            headers=auth(token1),
+        )
 
         habit_id = response.json()["id"]
 
-        #user2
+        # user2
         user2 = register_user(client)
         token2 = user2["access_token"]
 
-        #user2 tries to get habit
+        # user2 tries to get habit
 
         response = client.get(f"/habits/{habit_id}/", headers=auth(token2))
 
@@ -147,10 +156,11 @@ class TestUpdateHabit:
         habit_id = get_habit_id(client, auth_headers)
         new_name = random_habit_name()
 
-        response = client.patch(f"/habits/{habit_id}/", json={
-            "name": new_name,
-            "description": "updated habit"
-        }, headers=auth_headers)
+        response = client.patch(
+            f"/habits/{habit_id}/",
+            json={"name": new_name, "description": "updated habit"},
+            headers=auth_headers,
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -161,9 +171,11 @@ class TestUpdateHabit:
 
     def test_update_habit_description(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
-        response = client.patch(f"/habits/{habit_id}/", json={
-            "description": "updated habit"
-        }, headers=auth_headers)
+        response = client.patch(
+            f"/habits/{habit_id}/",
+            json={"description": "updated habit"},
+            headers=auth_headers,
+        )
 
         assert response.status_code == 200
         assert response.json()["description"] == "updated habit"
@@ -171,35 +183,39 @@ class TestUpdateHabit:
     def test_update_habit_empty_name(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
 
-        response = client.patch(f"/habits/{habit_id}/", json={
-            "name": ""
-        }, headers=auth_headers)
+        response = client.patch(
+            f"/habits/{habit_id}/", json={"name": ""}, headers=auth_headers
+        )
 
         assert response.status_code == 422
 
     def test_update_space_name(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
 
-        response = client.patch(f"/habits/{habit_id}", json={
-            "name": "      ",
-        }, headers=auth_headers)
+        response = client.patch(
+            f"/habits/{habit_id}",
+            json={
+                "name": "      ",
+            },
+            headers=auth_headers,
+        )
 
         assert response.status_code == 400
 
     def test_update_nonexistent_habit(self, client, auth_headers):
-        response = client.patch("/habits/123/", json={
-            "name": "test"
-        }, headers=auth_headers)
+        response = client.patch(
+            "/habits/123/", json={"name": "test"}, headers=auth_headers
+        )
 
         assert response.status_code == 404
 
     def test_update_habit_invalid_token(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
-        response = client.patch(f"/habits/{habit_id}/", json={
-            "name": "test"
-        }, headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.patch(
+            f"/habits/{habit_id}/",
+            json={"name": "test"},
+            headers={"Authorization": "wrong_token"},
+        )
 
         assert response.status_code == 401
 
@@ -238,9 +254,9 @@ class TestDeleteHabit:
     def test_delete_invalid_token(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
 
-        response = client.delete(f"/habits/{habit_id}/", headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.delete(
+            f"/habits/{habit_id}/", headers={"Authorization": "wrong_token"}
+        )
 
         assert response.status_code == 401
 
@@ -289,9 +305,13 @@ class TestMarkDone:
     def test_mark_done_other_user_habit(self, client):
         user1 = register_user(client)
         token1 = user1["access_token"]
-        habit = client.post("/habits/", json={
-            "name": random_habit_name(),
-        }, headers=auth(token1)).json()
+        habit = client.post(
+            "/habits/",
+            json={
+                "name": random_habit_name(),
+            },
+            headers=auth(token1),
+        ).json()
 
         user2 = register_user(client)
         token2 = user2["access_token"]
@@ -306,9 +326,9 @@ class TestMarkDone:
 
     def test_mark_done_wrong_token(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
-        response = client.post(f"/habits/{habit_id}/done/", headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.post(
+            f"/habits/{habit_id}/done/", headers={"Authorization": "wrong_token"}
+        )
         assert response.status_code == 401
 
 
@@ -364,12 +384,14 @@ class TestUndoDone:
     def test_undo_mark_wrong_token(self, client, auth_headers):
         habit_id = get_habit_id(client, auth_headers)
 
-        response = client.delete(f"/habits/{habit_id}/done/", headers={
-            "Authorization": "wrong_token"
-        })
+        response = client.delete(
+            f"/habits/{habit_id}/done/", headers={"Authorization": "wrong_token"}
+        )
         assert response.status_code == 401
 
-    def test_undo_mark_reduces_streak(self, client, auth_headers, freeze_time, base_time):
+    def test_undo_mark_reduces_streak(
+        self, client, auth_headers, freeze_time, base_time
+    ):
         email = random_email()
         with freeze_time(base_time - timedelta(days=1)):
             register_user(client, email, DEFAULT_PASSWORD)
@@ -391,8 +413,9 @@ class TestUndoDone:
 
         with freeze_time(base_time):
             client.delete(f"/habits/{habit_id}/done/", headers=auth_headers)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
-
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 1
@@ -417,9 +440,8 @@ class TestHabitStats:
 
         assert data["current_streak"] == 1
         assert data["best_streak"] == 1
-        assert data["completion_last_7_days"] == pytest.approx(1/7 * 100)
-        assert data["completion_last_30_days"] == pytest.approx(1/30 * 100)
-
+        assert data["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
+        assert data["completion_last_30_days"] == pytest.approx(1 / 30 * 100)
 
     def test_streak_multiple_days(self, client, auth_headers, freeze_time, base_time):
         email = random_email()
@@ -432,7 +454,9 @@ class TestHabitStats:
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
         assert stats["current_streak"] == 2
         assert stats["best_streak"] == 2
@@ -441,9 +465,13 @@ class TestHabitStats:
         user = register_user(client)
         token = user["access_token"]
 
-        habit = client.post("/habits/", json={
-            "name": random_habit_name(),
-        }, headers=auth(token)).json()
+        habit = client.post(
+            "/habits/",
+            json={
+                "name": random_habit_name(),
+            },
+            headers=auth(token),
+        ).json()
         habit_id = habit["id"]
 
         client.post(f"/habits/{habit_id}/done/", headers=auth(token))
@@ -469,10 +497,12 @@ class TestHabitStats:
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
             client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
-        assert stats["completion_last_7_days"] == pytest.approx(1/7 * 100)
-        assert stats["completion_last_30_days"] == pytest.approx(1/30 * 100)
+        assert stats["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
+        assert stats["completion_last_30_days"] == pytest.approx(1 / 30 * 100)
 
     def test_streak_break(self, client, auth_headers, freeze_time, base_time):
         email = random_email()
@@ -485,13 +515,15 @@ class TestHabitStats:
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 1
 
-        assert stats["completion_last_7_days"] == pytest.approx(2/7 * 100)
-        assert stats["completion_last_30_days"] == pytest.approx(2/30 * 100)
+        assert stats["completion_last_7_days"] == pytest.approx(2 / 7 * 100)
+        assert stats["completion_last_30_days"] == pytest.approx(2 / 30 * 100)
 
     def test_edge_last_7_days(self, client, auth_headers, freeze_time, base_time):
         email = random_email()
@@ -508,13 +540,15 @@ class TestHabitStats:
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 2
 
-        assert stats["completion_last_7_days"] == pytest.approx(2/7 * 100)
-        assert stats["completion_last_30_days"] == pytest.approx(3/30 * 100)
+        assert stats["completion_last_7_days"] == pytest.approx(2 / 7 * 100)
+        assert stats["completion_last_30_days"] == pytest.approx(3 / 30 * 100)
 
     def test_edge_last_30_days(self, client, auth_headers, freeze_time, base_time):
         email = random_email()
@@ -530,13 +564,16 @@ class TestHabitStats:
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            stats = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers).json()
+            stats = client.get(
+                f"/habits/{habit_id}/stats/", headers=auth_headers
+            ).json()
 
         assert stats["current_streak"] == 0
         assert stats["best_streak"] == 2
 
-        assert stats["completion_last_7_days"] == pytest.approx(0/7 * 100)
-        assert stats["completion_last_30_days"] == pytest.approx(1/30 * 100)
+        assert stats["completion_last_7_days"] == pytest.approx(0 / 7 * 100)
+        assert stats["completion_last_30_days"] == pytest.approx(1 / 30 * 100)
+
 
 class TestHabitHeatmap:
     def test_habit_heatmap(self, client, auth_headers):
@@ -567,9 +604,11 @@ class TestHabitHeatmap:
 
 # Helper
 
+
 def get_habit_id(client, auth_headers):
     habit = create_habit(client, auth_headers)
     return habit["id"]
+
 
 def auth(token):
     return {"Authorization": f"Bearer {token}"}

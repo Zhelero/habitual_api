@@ -1,4 +1,3 @@
-import hashlib
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
 
@@ -8,10 +7,12 @@ pwd_context = CryptContext(
     bcrypt__rounds=12,
 )
 
+
 def hash_password(password: str) -> str:
     if not isinstance(password, str):
         raise TypeError("Password must be a string")
     return pwd_context.hash(password)
+
 
 def verify_password(password: str, hashed: str) -> bool:
     if not isinstance(password, str):

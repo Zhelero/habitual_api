@@ -2,15 +2,18 @@ from datetime import datetime, timedelta, timezone
 
 from app.repositories.blacklist_repository import TokenBlacklistRepository
 
+
 def test_add_token(db):
     repo = TokenBlacklistRepository(db)
     token = repo.add("jti1", datetime.now())
     assert token is not None
 
+
 def test_is_blacklisted(db):
     repo = TokenBlacklistRepository(db)
     repo.add("jti1", datetime.now())
     assert repo.is_blacklisted("jti1") is True
+
 
 def test_delete_expired_tokens(db):
     repo = TokenBlacklistRepository(db)
@@ -26,6 +29,7 @@ def test_delete_expired_tokens(db):
     assert repo.is_blacklisted("old") is False
     assert repo.is_blacklisted("valid") is True
 
+
 def test_blacklist_duplicate(db):
     repo = TokenBlacklistRepository(db)
     jti = "abc"
@@ -35,6 +39,7 @@ def test_blacklist_duplicate(db):
     repo.add(jti, exp)
 
     assert repo.is_blacklisted(jti) is False
+
 
 def test_blacklist_unknown_token(db):
     repo = TokenBlacklistRepository(db)

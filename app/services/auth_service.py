@@ -11,17 +11,15 @@ from app.core.exceptions import (
     UserAlreadyExistsError,
     InvalidCredentialsError,
     UserNotFoundError,
-    InvalidTokenError, TokenRevokedError,
+    InvalidTokenError,
+    TokenRevokedError,
 )
 
 logger = logging.getLogger(__name__)
 
+
 class AuthService:
-    def __init__(
-            self,
-            repo: UserRepository,
-            blacklist_repo: TokenBlacklistRepository
-    ):
+    def __init__(self, repo: UserRepository, blacklist_repo: TokenBlacklistRepository):
         self.repo = repo
         self.blacklist_repo = blacklist_repo
 
@@ -60,9 +58,7 @@ class AuthService:
 
     def refresh(self, refresh_token: str) -> dict[str, str | int]:
         payload = decode_token(
-            refresh_token,
-            expected_type="refresh",
-            blacklist_repo=self.blacklist_repo
+            refresh_token, expected_type="refresh", blacklist_repo=self.blacklist_repo
         )
 
         try:
@@ -94,9 +90,7 @@ class AuthService:
 
     def get_current_user(self, token: str) -> User:
         payload = decode_token(
-            token,
-            expected_type="access",
-            blacklist_repo=self.blacklist_repo
+            token, expected_type="access", blacklist_repo=self.blacklist_repo
         )
 
         try:
@@ -113,10 +107,7 @@ class AuthService:
 
     def logout(self, token: str):
         try:
-            payload = decode_token(
-                token,
-                blacklist_repo=None
-            )
+            payload = decode_token(token, blacklist_repo=None)
         except InvalidTokenError:
             logger.warning("Logout with invalid token")
             return
@@ -136,14 +127,13 @@ class AuthService:
         if not self.blacklist_repo.is_blacklisted(jti):
             self.blacklist_repo.add(jti, expires_at)
 
-
     # HELPERS
 
     def _generate_tokens(self, user: User) -> dict[str, str]:
         payload = self._build_token_payload(user)
         return {
             "access_token": create_access_token(payload),
-            "refresh_token": create_refresh_token(payload)
+            "refresh_token": create_refresh_token(payload),
         }
 
     def _build_auth_response(self, user, tokens):

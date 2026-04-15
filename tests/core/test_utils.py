@@ -1,5 +1,6 @@
 from app.services.helpers import normalize_str
 
+
 def test_normalize_str():
     assert normalize_str("  teSt    ") == "test"
     assert normalize_str("TEst  ") == "test"

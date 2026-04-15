@@ -1,6 +1,12 @@
 from datetime import timedelta
 
-from tests.utils.helpers import create_habit, register_user, get_auth_headers, random_email
+from tests.utils.helpers import (
+    create_habit,
+    register_user,
+    get_auth_headers,
+    random_email,
+)
+
 
 def test_dashboard_stats(client, auth_headers):
     response = client.get("/dashboard/", headers=auth_headers)
@@ -8,15 +14,12 @@ def test_dashboard_stats(client, auth_headers):
     assert response.status_code == 200
     data = response.json()
 
-    assert set(data.keys()) == {
-        "total_habits",
-        "completed_today",
-        "best_streak"
-    }
+    assert set(data.keys()) == {"total_habits", "completed_today", "best_streak"}
 
     assert isinstance(data["total_habits"], int)
     assert isinstance(data["completed_today"], int)
     assert isinstance(data["best_streak"], int)
+
 
 def test_dashboard_with_data(client, auth_headers):
     habits = [create_habit(client, auth_headers) for _ in range(3)]
@@ -34,6 +37,7 @@ def test_dashboard_with_data(client, auth_headers):
     assert data["completed_today"] == 1
     assert data["best_streak"] == 1
 
+
 def test_dashboard_empty(client, auth_headers):
     response = client.get("/dashboard/", headers=auth_headers)
 
@@ -44,16 +48,18 @@ def test_dashboard_empty(client, auth_headers):
     assert data["completed_today"] == 0
     assert data["best_streak"] == 0
 
+
 def test_dashboard_no_token(client):
     response = client.get("/dashboard/")
 
     assert response.status_code == 401
 
+
 class TestAuth:
     def test_invalid_token(self, client):
-        response = client.get("/dashboard/", headers={
-            "Authorization": "Bearer invalid token"
-        })
+        response = client.get(
+            "/dashboard/", headers={"Authorization": "Bearer invalid token"}
+        )
         assert response.status_code == 401
 
     def test_blacklisted_token(self, client):
@@ -65,6 +71,7 @@ class TestAuth:
         response = client.get("/dashboard/", headers=headers)
 
         assert response.status_code == 401
+
 
 class TestIsolation:
     def test_users_see_only_own_habits(self, client):
@@ -113,7 +120,7 @@ class TestCompletedToday:
 
         client.delete(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
-        data_after =client.get("/dashboard/", headers=auth_headers).json()
+        data_after = client.get("/dashboard/", headers=auth_headers).json()
         assert data_after["total_habits"] == 1
         assert data_after["completed_today"] == 0
 
@@ -154,7 +161,6 @@ class TestCompletedToday:
 
         client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
-
         client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
         data = client.get("/dashboard/", headers=auth_headers).json()
@@ -184,7 +190,9 @@ class TestBestStreak:
         assert data["total_habits"] == 1
         assert data["best_streak"] == 3
 
-    def test_best_streak_is_max_across_habits(self, client, auth_headers, freeze_time, base_time):
+    def test_best_streak_is_max_across_habits(
+        self, client, auth_headers, freeze_time, base_time
+    ):
         email1 = random_email()
         email2 = random_email()
         password = "123456"
@@ -221,7 +229,6 @@ class TestBestStreak:
         assert data["total_habits"] == 1
         assert data["completed_today"] == 0
         assert data["best_streak"] == 0
-
 
 
 class TestTotalHabits:

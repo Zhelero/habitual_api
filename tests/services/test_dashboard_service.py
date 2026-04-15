@@ -13,11 +13,14 @@ from tests.utils.helpers import random_habit_name, random_email
 def user(db):
     repo = UserRepository(db)
     from app.core.security import hash_password
+
     return repo.create_user(random_email(), hash_password("123456"))
+
 
 @pytest.fixture
 def dashboard(db):
     return DashboardService(HabitRepository(db))
+
 
 @pytest.fixture
 def habits(db):
@@ -76,6 +79,7 @@ class TestTotalHabits:
 
         assert stats["total_habits"] == 2
 
+
 class TestCompletedToday:
     def test_completed_today_multiple(self, user, dashboard, habits):
         h1 = habits.create_habit(user.id, random_habit_name(), None)
@@ -124,7 +128,9 @@ class TestCompletedToday:
             assert new_habit.id is not None
             assert new_habit.id != habit.id
 
-    def test_mark_done_midnight_boundary(self, user, habits, dashboard, freeze_time, base_time):
+    def test_mark_done_midnight_boundary(
+        self, user, habits, dashboard, freeze_time, base_time
+    ):
         habit = habits.create_habit(user.id, random_habit_name(), None)
         midnight = base_time.replace(hour=23, minute=59)
         with freeze_time(midnight):
@@ -138,7 +144,9 @@ class TestCompletedToday:
             assert stats["completed_today"] == 1
             assert stats["best_streak"] == 2
 
-    def test_yesterday_completion_not_counted(self, user, dashboard, habits, freeze_time, base_time):
+    def test_yesterday_completion_not_counted(
+        self, user, dashboard, habits, freeze_time, base_time
+    ):
         habit = habits.create_habit(user.id, random_habit_name(), None)
 
         with freeze_time(base_time - timedelta(days=1)):
@@ -152,7 +160,9 @@ class TestCompletedToday:
 
 
 class TestBestStreak:
-    def test_best_streak_single_habits(self, user, dashboard, habits, freeze_time, base_time):
+    def test_best_streak_single_habits(
+        self, user, dashboard, habits, freeze_time, base_time
+    ):
         habit = habits.create_habit(user.id, random_habit_name(), None)
 
         with freeze_time(base_time - timedelta(days=2)):
@@ -171,6 +181,7 @@ class TestBestStreak:
     def test_best_streak_across_habits(self, db, dashboard, freeze_time, base_time):
         repo = UserRepository(db)
         from app.core.security import hash_password
+
         user = repo.create_user(random_email(), hash_password("123456"))
         habit_svc = HabitService(HabitRepository(db))
 
@@ -191,7 +202,9 @@ class TestBestStreak:
 
         assert stats["best_streak"] == 5
 
-    def test_best_streak_with_gap(self, user, dashboard, habits, freeze_time, base_time):
+    def test_best_streak_with_gap(
+        self, user, dashboard, habits, freeze_time, base_time
+    ):
         habit = habits.create_habit(user.id, random_habit_name(), None)
 
         with freeze_time(base_time - timedelta(days=3)):

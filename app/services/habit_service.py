@@ -1,4 +1,4 @@
-from datetime import date, timedelta, timezone, datetime
+from datetime import timedelta, timezone, datetime
 from typing import Any
 from sqlalchemy.exc import IntegrityError
 
@@ -9,8 +9,12 @@ from app.core.exceptions import (
     HabitAlreadyMarkedError,
     HabitAlreadyExistsError,
     HabitNotMarkedError,
-    NotFoundError, NameCannotBeEmptyError, HabitNameTooShortError, HabitNameTooLongError,
+    NotFoundError,
+    NameCannotBeEmptyError,
+    HabitNameTooShortError,
+    HabitNameTooLongError,
 )
+
 
 class HabitService:
     def __init__(self, repo: HabitRepository):
@@ -35,10 +39,11 @@ class HabitService:
         except IntegrityError:
             raise HabitAlreadyExistsError()
 
-
     # Update habit
 
-    def update_habit(self, user_id: int, habit_id: int, data: dict[str, Any]) -> Habit | None:
+    def update_habit(
+        self, user_id: int, habit_id: int, data: dict[str, Any]
+    ) -> Habit | None:
         self._get_habit_or_raise(user_id, habit_id)
 
         allowed_fields = {"name", "description"}
@@ -71,7 +76,6 @@ class HabitService:
             "limit": limit,
             "offset": offset,
         }
-
 
     # Delete habit
 
@@ -106,7 +110,6 @@ class HabitService:
 
         return True
 
-
     # Stats
 
     def get_stats(self, user_id: int, habit_id: int) -> dict[str, Any]:
@@ -133,17 +136,11 @@ class HabitService:
         best_streak = calculate_best_streak(log_dates)
 
         count_7 = self.repo.count_logs_between(
-            user_id,
-            habit_id,
-            today - timedelta(days=6),
-            today
+            user_id, habit_id, today - timedelta(days=6), today
         )
 
         count_30 = self.repo.count_logs_between(
-            user_id,
-            habit_id,
-            today - timedelta(days=29),
-            today
+            user_id, habit_id, today - timedelta(days=29), today
         )
 
         completion_last_7_days = (count_7 / 7) * 100 if count_7 else 0
@@ -165,13 +162,11 @@ class HabitService:
             "last_7_days": last_7_days,
         }
 
-
     def get_heatmap(self, user_id: int, habit_id: int) -> list[dict[str, Any]]:
 
         self._get_habit_or_raise(user_id, habit_id)
 
         return self.repo.get_heatmap(user_id, habit_id)
-
 
     # Helper
 
@@ -182,4 +177,3 @@ class HabitService:
             raise NotFoundError("Habit not found")
 
         return habit
-

@@ -2,11 +2,12 @@ import logging
 from sqlalchemy import select, exists, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.db.models import TokenBlacklist
 
 logger = logging.getLogger(__name__)
+
 
 class TokenBlacklistRepository:
     def __init__(self, db: Session):

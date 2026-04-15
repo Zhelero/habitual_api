@@ -8,17 +8,21 @@ from tests.utils.helpers import random_habit_name, random_email
 
 # Fixtures
 
+
 @pytest.fixture
 def repo(db):
     return HabitRepository(db)
+
 
 @pytest.fixture
 def user(db):
     return UserRepository(db).create_user(random_email(), hash_password("123456"))
 
+
 @pytest.fixture
 def other_user(db):
     return UserRepository(db).create_user(random_email(), hash_password("123456"))
+
 
 @pytest.fixture
 def habit(db, repo, user):
@@ -41,6 +45,7 @@ class TestCreateHabit:
 
     def test_duplicate_habit_name_same_user_raises(self, user, repo):
         from sqlalchemy.exc import IntegrityError
+
         repo.create_habit(user.id, "Habit name", "It's a description")
 
         with pytest.raises(IntegrityError):
@@ -156,7 +161,9 @@ class TestUpdateHabit:
         assert updated.name == "New Name"
 
     def test_updates_description(self, user, habit, repo):
-        updated = repo.update_habit(user.id, habit.id, {"description": "New Description"})
+        updated = repo.update_habit(
+            user.id, habit.id, {"description": "New Description"}
+        )
 
         assert updated.description == "New Description"
 
@@ -171,10 +178,11 @@ class TestUpdateHabit:
         assert result is None
 
     def test_update_to_duplicate_name_raises(self, user, repo):
-        h1 = repo.create_habit(user.id, "A", None)
+        repo.create_habit(user.id, "A", None)
         h2 = repo.create_habit(user.id, "B", None)
 
         from sqlalchemy.exc import IntegrityError
+
         with pytest.raises(IntegrityError):
             repo.update_habit(user.id, h2.id, {"name": "A"})
 
@@ -182,6 +190,7 @@ class TestUpdateHabit:
         result = repo.update_habit(user.id, habit.id, {})
 
         assert result is not None
+
 
 class TestDeleteHabit:
     def test_deletes_and_return_true(self, user, habit, repo):
@@ -271,6 +280,7 @@ class TestDeleteLog:
 
         assert result is False
 
+
 class TestGetLogs:
     def test_get_logs_by_habit_ordered_desc(self, user, habit, repo):
         today = date.today()
@@ -311,7 +321,8 @@ class TestCountLogsBetween:
             repo.add_log(user.id, habit.id, today - timedelta(days=i))
 
         count = repo.count_logs_between(
-            user.id, habit.id,
+            user.id,
+            habit.id,
             today - timedelta(days=6),
             today,
         )
@@ -334,7 +345,8 @@ class TestCountLogsBetween:
         repo.add_log(user.id, habit.id, today - timedelta(days=8))
 
         count = repo.count_logs_between(
-            user.id, habit.id,
+            user.id,
+            habit.id,
             today - timedelta(days=6),
             today,
         )
@@ -344,7 +356,8 @@ class TestCountLogsBetween:
     def test_returns_zero_no_logs(self, user, habit, repo):
         today = date.today()
         count = repo.count_logs_between(
-            user.id, habit.id,
+            user.id,
+            habit.id,
             today - timedelta(days=6),
             today,
         )
@@ -356,12 +369,11 @@ class TestCountLogsBetween:
         repo.add_log(user.id, habit.id, today)
 
         count = repo.count_logs_between(
-            other_user.id, habit.id,
-            today - timedelta(days=10),
-            today
+            other_user.id, habit.id, today - timedelta(days=10), today
         )
 
         assert count == 0
+
 
 class TestGetHeatmap:
     def test_returns_30_days(self, user, habit, repo):
