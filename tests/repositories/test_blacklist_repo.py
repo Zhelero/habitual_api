@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timedelta, timezone
 
 from app.repositories.blacklist_repository import TokenBlacklistRepository
@@ -15,6 +16,12 @@ def test_is_blacklisted(db):
     assert repo.is_blacklisted("jti1") is True
 
 
+@pytest.mark.parametrize("jti", ["", None])
+def test_is_blacklisted_empty_jti(db, jti):
+    repo = TokenBlacklistRepository(db)
+    assert repo.is_blacklisted(jti) is False
+
+
 def test_delete_expired_tokens(db):
     repo = TokenBlacklistRepository(db)
 
@@ -28,6 +35,16 @@ def test_delete_expired_tokens(db):
     assert deleted == 1
     assert repo.is_blacklisted("old") is False
     assert repo.is_blacklisted("valid") is True
+
+
+def test_delete_expired_tokens_none(db):
+    repo = TokenBlacklistRepository(db)
+    now = datetime.now(timezone.utc)
+
+    deleted = repo.delete_expired_tokens(now)
+
+    assert deleted == 0
+    assert repo.is_blacklisted("anything") is False
 
 
 def test_blacklist_duplicate(db):

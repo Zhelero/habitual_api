@@ -1,14 +1,18 @@
 # Habitual API
 
 > Production-ready REST API for habit tracking
-with JWT auth, PostgreSQL, Alembic, and full CI pipeline.
+with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pipeline.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-271%20passed-brightgreen?style=flat-square)
-![Coverage](https://img.shields.io/badge/coverage-~95%25-brightgreen?style=flat-square)
+![Architecture](https://img.shields.io/badge/architecture-layered-blue)
+![Auth](https://img.shields.io/badge/auth-JWT%20rotation-green)
+![Database](https://img.shields.io/badge/db-PostgreSQL-blue)
+![Tests](https://img.shields.io/badge/tests-295%20passed-brightgreen?style=flat-square)
+![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
+
 
 ---
 
@@ -17,9 +21,12 @@ with JWT auth, PostgreSQL, Alembic, and full CI pipeline.
 Habit tracking requires consistent state management and reliable statistics.
 
 This project focuses on:
+
 - correct streak calculation
 - data consistency across habit logs
 - secure authentication with token rotation and blacklist
+- clean service/repository architecture
+- high test coverage
 
 It also demonstrates how a test suite evolves alongside the application 
 and requires its own architecture.
@@ -28,17 +35,21 @@ and requires its own architecture.
 
 ## Features
 
-- JWT authentication with token rotation and blacklist (logout support)
+- JWT authentication (access + refresh tokens)
+- Refresh token rotation with reuse detection
+- Token blacklist with expiration cleanup
+- Request logging middleware
 - Full habit CRUD with user data isolation
-- Clear separation of concerns (Service / Repository architecture)
 - Mark habits as done / undo
-- Habit statistics — current streak, best streak, completion rate
-- Heatmap data for the last 30 days
+- Habit statistics (current streak, best streak, completion rate)
+- 30-day heatmap
 - Dashboard with aggregated stats
 - Paginated habits list
+- Structured error handling
+- Layered architecture (API / Service / Repository)
+- 98% test coverage
 
 ---
-
 ## Tech Stack
 
 | Layer      | Technology                              |
@@ -51,6 +62,7 @@ and requires its own architecture.
 | Migrations | Alembic                                 |
 | CI         | GitHub Actions                          |
 | Testing    | pytest, pytest-mock, TestClient         |
+| Logging    | structured request middleware           |
 | Docs       | Swagger UI / ReDoc (built-in)           |
 
 ---
@@ -82,17 +94,118 @@ app/
 │   ├── models.py     # SQLAlchemy models
 │   ├── session.py    # engine & SessionLocal
 │   └── deps.py       # get_db dependency
-└── core/
-    ├── config.py     # settings via pydantic-settings
-    ├── security.py   # password hashing
-    ├── jwt.py        # token creation & validation
-    ├── exceptions.py # custom exceptions
-    └── handlers.py   # exception handlers
+├── core/
+│   ├── config.py     # settings via pydantic-settings
+│   ├── security.py   # password hashing
+│   ├── jwt.py        # token creation & validation
+│   ├── middleware.py
+│   ├── exceptions.py # custom exceptions
+│   └── handlers.py   # exception handlers
+└── main.py
 
 ```
+---
+
+## Authentication Flow
+
+### Register
+
+
+POST /auth/register
+
+
+Returns:
+
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "token_type": "bearer",
+  "user_id": 1
+}
+```
+### Login
+POST /auth/login
+
+### Refresh (token rotation)
+POST /auth/refresh
+- old refresh token is blacklisted
+- new access + refresh returned
+- token reuse blocked
+
+### Logout
+POST /auth/logout
+
+- token added to blacklist
+- reuse prevented
+
 
 ---
 
+## Habit Flow
+
+### Create habit
+POST /habits
+
+### Mark done
+POST /habits/{id}/done
+
+### Undo
+DELETE /habits/{id}/done
+
+### Heatmap
+GET /habits/{id}/heatmap
+
+### Dashboard
+GET /dashboard
+
+Returns:
+```json
+{
+  "total_habits": 5,
+  "completed_today": 3,
+  "best_streak": 12
+}
+```
+---
+## Request Logging
+
+### Middleware logs:
+
+```
+127.0.0.1 GET /habits -> 200 (12ms) [curl/8.14.1]
+127.0.0.1 POST /auth/login -> 401 (3ms) [Mozilla/...]
+127.0.0.1 POST /auth/refresh -> 500 (2ms) [pytest]
+```
+Logged fields:
+
+- client IP
+- HTTP method
+- path
+- status
+- duration
+- user-agent
+
+---
+### Logs
+
+By default logs are written to:
+
+- stdout (console)
+- Docker logs (when running in container)
+
+Example:
+```
+docker compose logs -f app
+```
+Logs include:
+
+- request logs
+- errors
+- auth events
+- blacklist operations
+- startup info
+---
 ## Getting Started
 
 ### 1. Clone and install
@@ -241,20 +354,24 @@ pytest
 ```
 
 ```
-271 passed in 81.42s
+295 passed in  91.72s
 ```
 
-Tests include:
+## Test Coverage
 
-- API tests
-- service layer tests
-- repository tests
-- auth flow tests
-- database transaction tests
-- JWT tests
-- middleware tests
+Coverage includes:
 
-Coverage: ~95%
+- authentication flow
+- token rotation
+- blacklist behavior
+- middleware logging
+- repository layer
+- service layer
+- edge cases and error handling
+- race conditions
+- duplicate actions
+
+Total coverage: **98%**
 
 The test suite verifies:
 - full authentication flow (register → login → refresh → logout)

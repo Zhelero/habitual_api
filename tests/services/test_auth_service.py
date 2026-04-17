@@ -125,6 +125,14 @@ class TestRefreshToken:
         with pytest.raises(InvalidTokenError):
             service.refresh("invalid_token")
 
+    def test_refresh_invalid_subject(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token", return_value={"sub": "abc"}
+        )
+
+        with pytest.raises(InvalidTokenError):
+            service.refresh("token")
+
     def test_refresh_access_token(self, service):
         tokens = _create_user_and_login(service)
 
@@ -151,6 +159,21 @@ class TestRefreshToken:
         with pytest.raises(TokenRevokedError):
             service.refresh(refresh)
 
+    def test_refresh_reused_token(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token",
+            return_value={"sub": "1", "jti": "abc", "exp": 123},
+        )
+
+        mocker.patch.object(
+            service.blacklist_repo,
+            "is_blacklisted",
+            return_value=True,
+        )
+
+        with pytest.raises(TokenRevokedError):
+            service.refresh("token")
+
     def test_refresh_generates_new_jti(self, service):
         tokens = _create_user_and_login(service)
 
@@ -171,6 +194,14 @@ class TestRefreshToken:
 
         with pytest.raises(InvalidTokenError):
             service.refresh(broken)
+
+    def test_refresh_missing_jti_mock(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token", return_value={"sub": "1"}
+        )
+
+        with pytest.raises(InvalidTokenError):
+            service.refresh("token")
 
     def test_refresh_missing_exp(self, service):
         tokens = _create_user_and_login(service)
@@ -231,9 +262,27 @@ class TestMe:
         with pytest.raises(TokenRevokedError):
             service.get_current_user(tokens["access_token"])
 
+    def test_get_current_user_user_not_found(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token", return_value={"sub": "1"}
+        )
+
+        mocker.patch.object(service.repo, "get_by_id", return_value=None)
+
+        with pytest.raises(UserNotFoundError):
+            service.get_current_user("token")
+
     def test_me_invalid_token(self, service):
         with pytest.raises(InvalidTokenError):
             service.get_current_user("")
+
+    def test_me_invalid_subject(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token", return_value={"sub": "abc"}
+        )
+
+        with pytest.raises(InvalidTokenError):
+            service.get_current_user("token")
 
 
 class TestLogout:
@@ -299,6 +348,13 @@ class TestLogout:
 
     def test_logout_invalid_refresh_token(self, service):
         service.logout("invalid_refresh_token")
+
+    def test_logout_invalid_token(self, service, mocker):
+        mocker.patch(
+            "app.services.auth_service.decode_token", side_effect=InvalidTokenError()
+        )
+
+        service.logout("token")
 
 
 # HELPER

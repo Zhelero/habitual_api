@@ -1,3 +1,4 @@
+import logging
 from datetime import date, timezone, datetime, timedelta
 
 from sqlalchemy.orm import Session, aliased
@@ -5,6 +6,8 @@ from sqlalchemy.sql import Select
 from sqlalchemy import select, delete, func, update, literal, cast, Date
 
 from app.db.models import Habit, HabitLog
+
+logger = logging.getLogger("app.habits.repo")
 
 
 class HabitRepository:
@@ -20,6 +23,13 @@ class HabitRepository:
         self.db.flush()
         self.db.refresh(habit)
 
+        logger.info(
+            "Create habit user_id=%s habit_id=%s name=%s",
+            user_id,
+            habit.id,
+            name,
+        )
+
         return habit
 
     def update_habit(self, user_id: int, habit_id: int, data: dict) -> Habit | None:
@@ -34,6 +44,18 @@ class HabitRepository:
         self.db.flush()
         if updated:
             self.db.refresh(updated)
+            logger.info(
+                "Update habit user_id=%s habit_id=%s fields=%s",
+                user_id,
+                habit_id,
+                list(data.keys()),
+            )
+        else:
+            logger.debug(
+                "Update habit not found user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
 
         return updated
 
@@ -44,7 +66,6 @@ class HabitRepository:
             .order_by(Habit.created_at.desc())
         )
         result = self.db.execute(stmt)
-
         return result.scalars().all()
 
     def get_habit_by_id(self, user_id: int, habit_id: int) -> Habit | None:
@@ -72,7 +93,22 @@ class HabitRepository:
         result = self.db.execute(stmt)
         self.db.flush()
 
-        return result.rowcount > 0
+        deleted = result.rowcount > 0
+
+        if deleted:
+            logger.info(
+                "Delete habit user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
+        else:
+            logger.debug(
+                "Delete habit not found user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
+
+        return deleted
 
     # LOGS
 
@@ -81,6 +117,11 @@ class HabitRepository:
         habit = self.db.execute(stmt).scalar_one_or_none()
 
         if not habit:
+            logger.debug(
+                "Mark habit done not found user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
             return None
 
         existing_stmt = select(HabitLog).where(
@@ -89,11 +130,24 @@ class HabitRepository:
 
         existing = self.db.execute(existing_stmt).scalar_one_or_none()
         if existing:
+            logger.debug(
+                "Mark habit done duplicate user_id=%s habit_id=%s date=%s",
+                user_id,
+                habit_id,
+                log_date,
+            )
             return None
 
         log = HabitLog(habit_id=habit_id, date=log_date)
         self.db.add(log)
         self.db.flush()
+
+        logger.info(
+            "Mark habit done user_id=%s habit_id=%s date=%s",
+            user_id,
+            habit_id,
+            log_date,
+        )
 
         return log
 
@@ -140,7 +194,17 @@ class HabitRepository:
         result = self.db.execute(stmt)
         self.db.flush()
 
-        return result.rowcount > 0
+        deleted = result.rowcount > 0
+
+        if deleted:
+            logger.info(
+                "Undo habit done user_id=%s habit_id=%s date=%s",
+                user_id,
+                habit_id,
+                log_date,
+            )
+
+        return deleted
 
     def get_heatmap(self, user_id: int, habit_id: int):
         habit = self.get_habit_by_id(user_id, habit_id)

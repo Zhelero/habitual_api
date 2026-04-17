@@ -1,7 +1,10 @@
+import logging
 from datetime import date
 
 from app.repositories.habit_repository import HabitRepository
 from app.services.helpers import calculate_best_streak
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardService:
@@ -9,6 +12,8 @@ class DashboardService:
         self.repo = repo
 
     def get_dashboard_stats(self, user_id: int) -> dict[str, int]:
+
+        logger.debug("Getting dashboard stats for user id=%s", user_id)
 
         habits = self.repo.get_all_habits(user_id)
         logs = self.repo.get_all_logs(user_id)
@@ -29,6 +34,14 @@ class DashboardService:
             streak = calculate_best_streak(log_dates)
 
             best_streak = max(best_streak, streak)
+
+        logger.debug(
+            "Dashboard stats calculated user_id=%s total=%s completed_today=%s best=%s",
+            user_id,
+            total_habits,
+            completed_today,
+            best_streak,
+        )
 
         return {
             "total_habits": total_habits,

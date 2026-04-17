@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.db.models import TokenBlacklist
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app.blackist")
 
 
 class TokenBlacklistRepository:
@@ -18,10 +18,15 @@ class TokenBlacklistRepository:
         self.db.add(obj)
         try:
             self.db.flush()
+            logger.info(
+                "Token added to blacklist jti=%s, expires_at=%s",
+                jti,
+                expires_at,
+            )
             return obj
         except IntegrityError:
             self.db.rollback()
-            logger.debug(f"Token already blacklisted: {jti}")
+            logger.debug("Token already blacklisted jti=%s", jti)
             return None
 
     def is_blacklisted(self, jti: str) -> bool:
@@ -29,11 +34,26 @@ class TokenBlacklistRepository:
             return False
 
         stmt = select(exists().where(TokenBlacklist.jti == jti))
-        return bool(self.db.execute(stmt).scalar())
+        result = bool(self.db.execute(stmt).scalar())
+
+        logger.debug(
+            "Check blacklist jti=%s, blacklisted=%s",
+            jti,
+            result,
+        )
+
+        return result
 
     def delete_expired_tokens(self, now: datetime) -> int:
         stmt = delete(TokenBlacklist).where(TokenBlacklist.expires_at < now)
 
         result = self.db.execute(stmt)
         self.db.flush()
-        return result.rowcount
+        deleted = result.rowcount or 0
+
+        if deleted:
+            logger.info("Deleted expired blacklist tokens count=%s", deleted)
+        else:
+            logger.debug("No expired blacklist tokens to delete")
+
+        return deleted

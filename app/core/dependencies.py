@@ -1,3 +1,4 @@
+import logging
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -12,6 +13,8 @@ from app.services.habit_service import HabitService
 from app.services.dashboard_service import DashboardService
 from app.services.auth_service import AuthService
 from app.core.exceptions import InvalidTokenError, TokenRevokedError
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
 
@@ -75,6 +78,7 @@ def get_current_user(
 ) -> User:
 
     if not credentials:
+        logger.warning("Auth failed: no credentials")
         raise HTTPException(status_code=401, detail=NOT_AUTHENTICATED)
 
     token = credentials.credentials.strip()
@@ -84,17 +88,21 @@ def get_current_user(
             token, expected_type="access", blacklist_repo=blacklist_repo
         )
     except InvalidTokenError:
+        logger.warning("Auth failed: invalid token")
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)
     except TokenRevokedError:
+        logger.warning("Auth failed: revoked token")
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)
 
     try:
         user_id = int(payload["sub"])
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, ValueError):
+        logger.warning("Auth failed: invalid subject in token")
         raise HTTPException(status_code=401, detail=UNAUTHORIZED)
 
     user = repo.get_by_id(user_id)
     if not user:
+        logger.warning("Auth failed: user not found id=%s", user_id)
         raise HTTPException(status_code=401, detail=USER_NOT_FOUND)
 
     return user

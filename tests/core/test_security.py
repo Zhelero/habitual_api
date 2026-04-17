@@ -1,6 +1,7 @@
 import pytest
+from passlib.exc import UnknownHashError
 
-from app.core.security import verify_password, hash_password
+from app.core.security import verify_password, hash_password, pwd_context
 
 
 def test_verify_password_true():
@@ -37,11 +38,46 @@ def test_verify_does_not_modify_hash():
     assert isinstance(hashed, str)
 
 
+def test_verify_password_unknown_hash(mocker):
+    mocker.patch.object(pwd_context, "verify", side_effect=UnknownHashError())
+
+    result = verify_password("123456", "some_hash")
+    assert result is False
+
+
+def test_verify_password_value_error(mocker):
+    mocker.patch.object(pwd_context, "verify", side_effect=ValueError("bad"))
+
+    result = verify_password("123456", "some_hash")
+    assert result is False
+
+
+def test_verify_password_unexpected_error(mocker):
+    mocker.patch.object(pwd_context, "verify", side_effect=RuntimeError("boom"))
+
+    result = verify_password("123456", "some_hash")
+    assert result is False
+
+
 def test_hash_password_not_equal_plain():
     password = "123456"
     hashed = hash_password(password)
 
     assert hashed != password
+
+
+@pytest.mark.parametrize("password", [None, 123, [], {}])
+def test_verify_password_invalid_types(password):
+    result = verify_password(password, "hash")
+
+    assert result is False
+
+
+def test_hash_password_unexpected_error(mocker):
+    mocker.patch.object(pwd_context, "hash", side_effect=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError):
+        hash_password("123456")
 
 
 def test_hash_password_changes():

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Query, status
 
 from app.db.models import User
@@ -12,7 +13,10 @@ from app.api.schemas import (
     PaginatedHabits,
 )
 
+logger = logging.getLogger("app.habits")
+
 router = APIRouter(prefix="/habits", tags=["habits"])
+
 
 # Create
 
@@ -28,6 +32,11 @@ def create_habit(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.info(
+        "Create habit user_id=%s name=%s",
+        user.id,
+        habit.name,
+    )
     return service.create_habit(user.id, habit.name, habit.description)
 
 
@@ -45,6 +54,12 @@ def get_habits(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.debug(
+        "List habits user_id=%s limit=%s offset=%s",
+        user.id,
+        limit,
+        offset,
+    )
     return service.get_habits(user.id, limit, offset)
 
 
@@ -57,6 +72,11 @@ def get_habit(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.debug(
+        "Get habit user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     return service.get_habit(user.id, habit_id)
 
 
@@ -70,6 +90,11 @@ def update_habit(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.info(
+        "Update habit user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     return service.update_habit(
         user.id, habit_id, payload.model_dump(exclude_unset=True)
     )
@@ -86,6 +111,11 @@ def delete_habit(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.info(
+        "Delete habit user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     service.delete_habit(user.id, habit_id)
     return None
 
@@ -103,6 +133,11 @@ def mark_done(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.info(
+        "Mark habit done user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     service.mark_done(user.id, habit_id)
     return None
 
@@ -120,6 +155,11 @@ def undo_done(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.info(
+        "Undo habit done user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     service.undo_done(user.id, habit_id)
     return None
 
@@ -137,6 +177,11 @@ def get_stats(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.debug(
+        "Get habit stats user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     return service.get_stats(user.id, habit_id)
 
 
@@ -153,4 +198,9 @@ def get_heatmap(
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
+    logger.debug(
+        "Get habit heatmap user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
     return service.get_heatmap(user.id, habit_id)

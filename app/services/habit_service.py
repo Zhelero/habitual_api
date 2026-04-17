@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta, timezone, datetime
 from typing import Any
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +16,8 @@ from app.core.exceptions import (
     HabitNameTooLongError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class HabitService:
     def __init__(self, repo: HabitRepository):
@@ -26,18 +29,37 @@ class HabitService:
         name = name.strip()
 
         if not name:
+            logger.warning("Create habit failed: empty name user_id=%s", user_id)
             raise NameCannotBeEmptyError
 
         if len(name) < 2:
+            logger.warning(
+                "Create habit failed: name too short user_id=%s name=%s",
+                user_id,
+                name,
+            )
             raise HabitNameTooShortError
 
         if len(name) > 100:
+            logger.warning(
+                "Create habit failed: name too long user_id=%s name=%s",
+                user_id,
+                name,
+            )
             raise HabitNameTooLongError
 
         try:
-            return self.repo.create_habit(user_id, name, description)
+            habit = self.repo.create_habit(user_id, name, description)
         except IntegrityError:
+            logger.warning(
+                "Create habit failed: already exists user_id=%s name=%s",
+                user_id,
+                name,
+            )
             raise HabitAlreadyExistsError()
+
+        logger.info("Habit created id=%s user_id=%s", habit.id, user_id)
+        return habit
 
     # Update habit
 
@@ -55,9 +77,24 @@ class HabitService:
         try:
             updated = self.repo.update_habit(user_id, habit_id, update_data)
         except IntegrityError:
+            logger.warning(
+                "Update habit failed: duplicate name user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
             raise HabitAlreadyExistsError()
 
+        logger.info("Habit updated id=%s user_id=%s", habit_id, user_id)
         return updated
+
+    # Delete habit
+
+    def delete_habit(self, user_id: int, habit_id: int):
+        self._get_habit_or_raise(user_id, habit_id)
+        self.repo.delete_habit(user_id, habit_id)
+
+        logger.info("Habit deleted habit_id=%s user_id=%s", habit_id, user_id)
+        return None
 
     # Get habit by id
 
@@ -77,13 +114,6 @@ class HabitService:
             "offset": offset,
         }
 
-    # Delete habit
-
-    def delete_habit(self, user_id: int, habit_id: int):
-        self._get_habit_or_raise(user_id, habit_id)
-        self.repo.delete_habit(user_id, habit_id)
-        return None
-
         # Mark done
 
     def mark_done(self, user_id: int, habit_id: int) -> HabitLog:
@@ -93,8 +123,18 @@ class HabitService:
 
         log = self.repo.add_log(user_id, habit_id, today)
         if log is None:
+            logger.warning(
+                "Mark done failed: already marked user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
             raise HabitAlreadyMarkedError()
 
+        logger.info(
+            "Habit marked done user_id=%s habit_id=%s",
+            user_id,
+            habit_id,
+        )
         return log
 
     # Undo mark done
@@ -106,8 +146,18 @@ class HabitService:
 
         deleted = self.repo.delete_log(user_id, habit_id, today)
         if not deleted:
+            logger.warning(
+                "Undo failed: not marked user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
             raise HabitNotMarkedError()
 
+        logger.info(
+            "Habit undone user_id=%s habit_id=%s",
+            user_id,
+            habit_id,
+        )
         return True
 
     # Stats
@@ -154,6 +204,12 @@ class HabitService:
             for i in range(6, -1, -1)
         ]
 
+        logger.debug(
+            "Stats calculated user_id=%s habit_id=%s",
+            user_id,
+            habit_id,
+        )
+
         return {
             "current_streak": streak,
             "best_streak": best_streak,
@@ -166,6 +222,12 @@ class HabitService:
 
         self._get_habit_or_raise(user_id, habit_id)
 
+        logger.debug(
+            "Heatmap requested user_id=%s habit_id=%s",
+            user_id,
+            habit_id,
+        )
+
         return self.repo.get_heatmap(user_id, habit_id)
 
     # Helper
@@ -174,6 +236,11 @@ class HabitService:
         habit = self.repo.get_habit_by_id(user_id, habit_id)
 
         if not habit:
+            logger.warning(
+                "Habit not found user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
             raise NotFoundError("Habit not found")
 
         return habit

@@ -27,9 +27,11 @@ class AuthService:
         email = self._normalize_email(email)
 
         if not password or not password.strip():
+            logger.warning("Register failed: empty password email=%s", email)
             raise InvalidCredentialsError()
 
         if len(password.strip()) < 6:
+            logger.warning("Register failed: password too short email=%s", email)
             raise InvalidCredentialsError()
 
         password_hash = hash_password(password)
@@ -37,10 +39,12 @@ class AuthService:
         try:
             user = self.repo.create_user(email, password_hash)
         except IntegrityError:
-            logger.warning("User already exists: %s", email)
+            logger.warning("Register failed: user exists: %s", email)
             raise UserAlreadyExistsError()
-        tokens = self._generate_tokens(user)
 
+        logger.info("User registered id=%s email=%s", user.id, email)
+
+        tokens = self._generate_tokens(user)
         return self._build_auth_response(user, tokens)
 
     def login(self, email: str, password: str) -> dict[str, str | int]:
@@ -49,11 +53,12 @@ class AuthService:
         user = self.repo.get_by_email(email)
 
         if not user or not verify_password(password, user.password_hash):
-            logger.warning("Invalid login attempt", extra={"email": email})
+            logger.warning("Login failed email=%s", email)
             raise InvalidCredentialsError()
 
-        tokens = self._generate_tokens(user)
+        logger.info("User login id=%s", user.id)
 
+        tokens = self._generate_tokens(user)
         return self._build_auth_response(user, tokens)
 
     def refresh(self, refresh_token: str) -> dict[str, str | int]:
@@ -64,16 +69,18 @@ class AuthService:
         try:
             user_id = int(payload["sub"])
         except (KeyError, ValueError):
+            logger.warning("Refresh failed: invalid subject")
             raise InvalidTokenError("Invalid subject")
 
         jti = payload.get("jti")
         if not jti:
-            logger.warning("Refresh: missing jti")
+            logger.warning("Refresh failed: missing jti")
             raise InvalidTokenError("Missing jti")
 
         expires_at = self._get_expires_at(payload)
 
         if self.blacklist_repo.is_blacklisted(jti):
+            logger.warning("Refresh failed: token reused jti=%s", jti)
             raise TokenRevokedError("Token already used")
 
         self.blacklist_repo.add(jti, expires_at)
@@ -81,11 +88,12 @@ class AuthService:
         user = self.repo.get_by_id(user_id)
 
         if not user:
-            logger.warning("User not found during refresh")
+            logger.warning("Refresh failed: user not found id=%s", user_id)
             raise UserNotFoundError()
 
-        tokens = self._generate_tokens(user)
+        logger.info("User refreshed id=%s", user.id)
 
+        tokens = self._generate_tokens(user)
         return self._build_auth_response(user, tokens)
 
     def get_current_user(self, token: str) -> User:
@@ -96,11 +104,13 @@ class AuthService:
         try:
             user_id = int(payload["sub"])
         except (KeyError, ValueError):
+            logger.warning("Access token invalid subject")
             raise InvalidTokenError("Invalid subject")
 
         user = self.repo.get_by_id(user_id)
 
         if not user:
+            logger.warning("User from token not found id=%s", user_id)
             raise UserNotFoundError()
 
         return user
@@ -109,23 +119,24 @@ class AuthService:
         try:
             payload = decode_token(token, blacklist_repo=None)
         except InvalidTokenError:
-            logger.warning("Logout with invalid token")
+            logger.warning("Logout failed: invalid token")
             return
 
         jti = payload.get("jti")
         if not jti:
-            logger.warning("Logout: missing jti")
+            logger.warning("Logout failed: missing jti")
             return
 
         exp = payload.get("exp")
         if not exp:
-            logger.warning("Logout: missing exp")
+            logger.warning("Logout failed: missing exp")
             return
 
         expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
 
         if not self.blacklist_repo.is_blacklisted(jti):
             self.blacklist_repo.add(jti, expires_at)
+            logger.info("User logout jti=%s", jti)
 
     # HELPERS
 

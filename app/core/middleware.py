@@ -6,19 +6,44 @@ logger = logging.getLogger("app.requests")
 
 
 async def log_requests(request: Request, call_next):
-    start_time = time.time()
+    start_time = time.perf_counter()
 
-    response = await call_next(request)
+    client = request.client.host if request.client else "unknown"
+    method = request.method
+    path = request.url.path
+    user_agent = request.headers.get("User-Agent", "-")
 
-    duration = round((time.time() - start_time) * 1000, 2)
+    if request.url.query:
+        path = f"{path}?{request.url.query}"
 
-    logger.info(
-        "%s %s %s - %s - %sms",
-        request.client.host,
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration,
-    )
+    message = "%s %s %s -> %s (%sms) [%s]"
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration = round((time.perf_counter() - start_time) * 1000, 2)
+
+        logger.exception(
+            message,
+            client,
+            method,
+            path,
+            500,
+            duration,
+            user_agent,
+        )
+        raise
+
+    duration = round((time.perf_counter() - start_time) * 1000, 2)
+    status = response.status_code
+
+    if status >= 500:
+        logger.error(message, client, method, path, status, duration, user_agent)
+
+    elif status >= 400:
+        logger.warning(message, client, method, path, status, duration, user_agent)
+
+    else:
+        logger.info(message, client, method, path, status, duration, user_agent)
 
     return response
