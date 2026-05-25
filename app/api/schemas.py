@@ -9,7 +9,7 @@ from pydantic import (
 from datetime import datetime, date
 from typing import Literal
 
-from app.services.helpers import normalize_str
+from app.services.helpers import normalize_name, normalize_description
 from app.core.exceptions import AtLeastOneFieldError, NameCannotBeEmptyError
 
 
@@ -62,7 +62,7 @@ class HabitCreate(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str | None):
-        value = normalize_str(value)
+        value = normalize_name(value)
 
         if not value:
             raise NameCannotBeEmptyError("Name can't be empty")
@@ -72,7 +72,7 @@ class HabitCreate(BaseModel):
     @field_validator("description")
     @classmethod
     def validate_description(cls, value: str | None):
-        return normalize_str(value)
+        return normalize_description(value)
 
 
 class HabitResponse(BaseModel):
@@ -98,7 +98,7 @@ class HabitUpdate(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str | None):
-        value = normalize_str(value)
+        value = normalize_name(value)
 
         if not value:
             raise NameCannotBeEmptyError("Name can't be empty")
@@ -108,7 +108,7 @@ class HabitUpdate(BaseModel):
     @field_validator("description")
     @classmethod
     def validate_description(cls, value: str | None):
-        return normalize_str(value)
+        return normalize_description(value)
 
 
 class HabitHeatmap(BaseModel):

@@ -60,10 +60,8 @@ class TestRegister:
 
 
 class TestLogin:
-    def test_login_success(self, service):
-        email = random_email()
-        service.register(email, DEFAULT_PASSWORD)
-        tokens = service.login(email, DEFAULT_PASSWORD)
+    def test_login_success(self, user, service):
+        tokens = service.login(user.email, DEFAULT_PASSWORD)
 
         assert "access_token" in tokens
         assert "refresh_token" in tokens
@@ -79,19 +77,15 @@ class TestLogin:
         with pytest.raises(InvalidCredentialsError):
             service.login("no@user.com", DEFAULT_PASSWORD)
 
-    def test_login_wrong_password(self, service):
-        email = random_email()
-        service.register(email, DEFAULT_PASSWORD)
-
+    def test_login_wrong_password(self, user, service):
         with pytest.raises(InvalidCredentialsError):
-            service.login(email, "wrong123")
+            service.login(user.email, "wrong123")
 
 
 class TestRefreshToken:
-    def test_refresh_success(self, service):
-        tokens = _create_user_and_login(service)
-        refresh_token = tokens["refresh_token"]
-        access_token = tokens["access_token"]
+    def test_refresh_success(self, service, auth_tokens):
+        refresh_token = auth_tokens["refresh_token"]
+        access_token = auth_tokens["access_token"]
 
         new_tokens = service.refresh(refresh_token)
 
@@ -107,9 +101,8 @@ class TestRefreshToken:
         decoded = decode_token(new_tokens["access_token"])
         assert int(decoded["sub"]) > 0
 
-    def test_refresh_rotates_and_invalidates_old_token(self, service):
-        tokens = _create_user_and_login(service)
-        old_refresh_token = tokens["refresh_token"]
+    def test_refresh_rotates_and_invalidates_old_token(self, service, auth_tokens):
+        old_refresh_token = auth_tokens["refresh_token"]
 
         rotation_tokens = service.refresh(old_refresh_token)
         new_refresh_token = rotation_tokens["refresh_token"]
@@ -133,16 +126,12 @@ class TestRefreshToken:
         with pytest.raises(InvalidTokenError):
             service.refresh("token")
 
-    def test_refresh_access_token(self, service):
-        tokens = _create_user_and_login(service)
-
+    def test_refresh_access_token(self, service, auth_tokens):
         with pytest.raises(InvalidTokenError):
-            service.refresh(tokens["access_token"])
+            service.refresh(auth_tokens["access_token"])
 
-    def test_refresh_user_not_found(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_user_not_found(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         payload["sub"] = "999999"
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -150,9 +139,8 @@ class TestRefreshToken:
         with pytest.raises(UserNotFoundError):
             service.refresh(broken)
 
-    def test_refresh_after_logout(self, service):
-        tokens = _create_user_and_login(service)
-        refresh = tokens["refresh_token"]
+    def test_refresh_after_logout(self, service, auth_tokens):
+        refresh = auth_tokens["refresh_token"]
 
         service.logout(refresh)
 
@@ -174,20 +162,16 @@ class TestRefreshToken:
         with pytest.raises(TokenRevokedError):
             service.refresh("token")
 
-    def test_refresh_generates_new_jti(self, service):
-        tokens = _create_user_and_login(service)
+    def test_refresh_generates_new_jti(self, service, auth_tokens):
+        first = decode_token(auth_tokens["refresh_token"])
 
-        first = decode_token(tokens["refresh_token"])
-
-        new = service.refresh(tokens["refresh_token"])
+        new = service.refresh(auth_tokens["refresh_token"])
         second = decode_token(new["refresh_token"])
 
         assert first["jti"] != second["jti"]
 
-    def test_refresh_missing_jti(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_missing_jti(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         payload.pop("jti")
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -203,10 +187,8 @@ class TestRefreshToken:
         with pytest.raises(InvalidTokenError):
             service.refresh("token")
 
-    def test_refresh_missing_exp(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_missing_exp(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         payload.pop("exp")
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -214,20 +196,16 @@ class TestRefreshToken:
         with pytest.raises(InvalidTokenError):
             service.refresh(broken)
 
-    def test_refresh_exp_datetime(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_exp_datetime(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         payload["exp"] = datetime.now(timezone.utc)
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
         service.refresh(broken)
 
-    def test_refresh_invalid_exp_format(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_invalid_exp_format(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         payload["exp"] = "invalid"
 
         broken = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -235,32 +213,26 @@ class TestRefreshToken:
         with pytest.raises(InvalidTokenError):
             service.refresh(broken)
 
-    def test_refresh_blacklist_old_token(self, service):
-        tokens = _create_user_and_login(service)
-
-        payload = decode_token(tokens["refresh_token"])
+    def test_refresh_blacklist_old_token(self, service, auth_tokens):
+        payload = decode_token(auth_tokens["refresh_token"])
         jti = payload["jti"]
 
-        service.refresh(tokens["refresh_token"])
+        service.refresh(auth_tokens["refresh_token"])
 
         assert service.blacklist_repo.is_blacklisted(jti)
 
 
 class TestMe:
-    def test_me_success(self, service):
-        tokens = _create_user_and_login(service)
-
-        user = service.get_current_user(tokens["access_token"])
-        assert user.id == tokens["user_id"]
+    def test_me_success(self, service, auth_tokens):
+        user = service.get_current_user(auth_tokens["access_token"])
+        assert user.id == auth_tokens["user_id"]
         assert "@" in user.email
 
-    def test_me_revoked_token(self, service):
-        tokens = _create_user_and_login(service)
-
-        service.logout(tokens["access_token"])
+    def test_me_revoked_token(self, service, auth_tokens):
+        service.logout(auth_tokens["access_token"])
 
         with pytest.raises(TokenRevokedError):
-            service.get_current_user(tokens["access_token"])
+            service.get_current_user(auth_tokens["access_token"])
 
     def test_get_current_user_user_not_found(self, service, mocker):
         mocker.patch(
@@ -286,34 +258,28 @@ class TestMe:
 
 
 class TestLogout:
-    def test_logout_revokes_token(self, service):
-        tokens = _create_user_and_login(service)
-        access_token = tokens["access_token"]
+    def test_logout_revokes_token(self, service, auth_tokens):
+        access_token = auth_tokens["access_token"]
 
         service.logout(access_token)
 
         with pytest.raises(TokenRevokedError):
             decode_token(access_token, blacklist_repo=service.blacklist_repo)
 
-    def test_logout_and_login_success(self, service):
-        email = random_email()
-
-        service.register(email, DEFAULT_PASSWORD)
-        tokens = service.login(email, DEFAULT_PASSWORD)
+    def test_logout_and_login_success(self, service, user):
+        tokens = service.login(user.email, DEFAULT_PASSWORD)
 
         service.logout(tokens["access_token"])
 
-        new = service.login(email, DEFAULT_PASSWORD)
+        new = service.login(user.email, DEFAULT_PASSWORD)
 
         assert new["access_token"] != tokens["access_token"]
 
-    def test_logout_and_refresh_token(self, service):
-        tokens = _create_user_and_login(service)
-
-        service.logout(tokens["refresh_token"])
+    def test_logout_and_refresh_token(self, service, auth_tokens):
+        service.logout(auth_tokens["refresh_token"])
 
         with pytest.raises(TokenRevokedError):
-            service.refresh(tokens["refresh_token"])
+            service.refresh(auth_tokens["refresh_token"])
 
     def test_logout_does_not_crash_on_invalid_token(self, service):
         service.logout("invalid_token")
@@ -339,9 +305,8 @@ class TestLogout:
 
         service.logout(broken)
 
-    def test_logout_twice(self, service):
-        tokens = _create_user_and_login(service)
-        access = tokens["access_token"]
+    def test_logout_twice(self, service, auth_tokens):
+        access = auth_tokens["access_token"]
 
         service.logout(access)
         service.logout(access)
@@ -355,13 +320,3 @@ class TestLogout:
         )
 
         service.logout("token")
-
-
-# HELPER
-
-
-def _create_user_and_login(service):
-    email = random_email()
-    service.register(email, DEFAULT_PASSWORD)
-
-    return service.login(email, DEFAULT_PASSWORD)

@@ -2,13 +2,13 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
+from tests.factories.user_factory import UserFactory
 from tests.utils.helpers import random_email, register_user, get_auth_headers
 
 DEFAULT_PASSWORD = "123456"
 
 
 class TestRegister:
-
     def test_register_success(self, client):
         email = random_email()
 
@@ -30,10 +30,11 @@ class TestRegister:
         assert me.json()["email"] == email.lower()
 
     def test_register_duplicate(self, client):
-        email = random_email()
-        payload = {"email": email, "password": DEFAULT_PASSWORD}
-        client.post("/auth/register/", json=payload)
-        response = client.post("/auth/register/", json=payload)
+        user = UserFactory()
+
+        response = client.post(
+            "/auth/register/", json={"email": user.email, "password": DEFAULT_PASSWORD}
+        )
 
         assert response.status_code == 409
 
@@ -138,52 +139,53 @@ class TestMe:
         assert response.status_code == 401
 
     def test_user_id_consistency(self, client):
-        user = register_user(client)
+        auth = register_user(client)
 
-        user_id = user["user_id"]
-        token = user["access_token"]
+        response = client.get(
+            "/auth/me/", headers={"Authorization": f"Bearer {auth['access_token']}"}
+        )
 
-        me = client.get("/auth/me/", headers={"Authorization": f"Bearer {token}"})
-
-        assert me.json()["id"] == user_id
+        assert response.json()["id"] == auth["user_id"]
 
 
 class TestRefresh:
     def test_refresh_success(self, client):
         user = register_user(client)
-        old_refresh = user["refresh_token"]
 
-        response2 = client.post("/auth/refresh/", json={"refresh_token": old_refresh})
+        response = client.post(
+            "/auth/refresh/", json={"refresh_token": user["refresh_token"]}
+        )
 
-        new_refresh = response2.json()["refresh_token"]
+        assert response.status_code == 200
 
-        assert response2.status_code == 200
+        data = response.json()
 
-        assert old_refresh != new_refresh
+        assert data["token_type"] == "bearer"
+        assert data["user_id"] == user["user_id"]
 
-        data = response2.json()
+        assert data["access_token"] != user["access_token"]
+        assert data["refresh_token"] != user["refresh_token"]
 
         assert isinstance(data["access_token"], str)
         assert isinstance(data["refresh_token"], str)
-        assert data["token_type"] == "bearer"
-        assert data["user_id"] == user["user_id"]
-        assert data["access_token"] != user["access_token"]
 
     def test_refresh_chain(self, client):
         user = register_user(client)
 
-        refresh_token = user["refresh_token"]
-
         # first refresh
-        res2 = client.post("/auth/refresh/", json={"refresh_token": refresh_token})
-
-        assert res2.status_code == 200
-        new_refresh = res2.json()["refresh_token"]
+        first = client.post(
+            "/auth/refresh/", json={"refresh_token": user["refresh_token"]}
+        )
 
         # second refresh with new token
-        res3 = client.post("/auth/refresh/", json={"refresh_token": new_refresh})
+        second = client.post(
+            "/auth/refresh/", json={"refresh_token": first.json()["refresh_token"]}
+        )
 
-        assert res3.status_code == 200
+        assert first.status_code == 200
+        assert second.status_code == 200
+
+        assert first.json()["refresh_token"] != second.json()["refresh_token"]
 
     def test_refresh_token_rotation(self, client):
         user = register_user(client)
@@ -245,7 +247,7 @@ class TestRefresh:
             "/auth/refresh/", json={"refresh_token": user["refresh_token"]}
         )
 
-        assert response.status_code in (200, 401)
+        assert response.status_code == 200
 
 
 class TestLogout:
@@ -266,14 +268,14 @@ class TestLogout:
 
         response = client.post("/auth/logout/", headers=auth_headers)
 
-        assert response.status_code in (204, 401)
+        assert response.status_code == 204
 
     def test_logout_invalid_token(self, client):
         response = client.post(
             "/auth/logout/", headers={"Authorization": "Bearer invalid_token"}
         )
 
-        assert response.status_code in (204, 401)
+        assert response.status_code == 204
 
     def test_logout_empty_token(self, client):
         response = client.post("/auth/logout/", headers={})

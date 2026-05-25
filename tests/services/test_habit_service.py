@@ -10,26 +10,30 @@ from app.core.exceptions import (
     NotFoundError,
     HabitNotMarkedError,
 )
-from app.services.habit_service import HabitService
 from app.repositories.habit_repository import HabitRepository
-from app.repositories.user_repository import UserRepository
-from tests.utils.helpers import random_habit_name, random_email
+from app.services.habit_service import HabitService
+
+from tests.factories.habit_factory import HabitFactory
+from tests.factories.log_factory import HabitLogFactory
+from tests.utils.helpers import random_habit_name
+from tests.factories.user_factory import UserFactory
 
 
 @pytest.fixture
-def user(db):
-    repo = UserRepository(db)
-    from app.core.security import hash_password
-
-    return repo.create_user(random_email(), hash_password("123456"))
+def user():
+    return UserFactory()
 
 
 @pytest.fixture
 def other_user(db):
-    repo = UserRepository(db)
-    from app.core.security import hash_password
+    return UserFactory()
 
-    return repo.create_user(random_email(), hash_password("123456"))
+
+@pytest.fixture
+def habit(db, user):
+    habit = HabitFactory(user=user)
+    db.commit()
+    return habit
 
 
 @pytest.fixture
@@ -37,16 +41,16 @@ def habit_service(db):
     return HabitService(HabitRepository(db))
 
 
-@pytest.fixture
-def habit(habit_service, user):
-    return habit_service.create_habit(user.id, random_habit_name(), None)
-
-
 class TestCreateHabit:
     def test_create_habit(self, user, habit_service):
         name = random_habit_name()
         description = "This is a test habit"
-        habit = habit_service.create_habit(user.id, name, description)
+
+        habit = habit_service.create_habit(
+            user.id,
+            name,
+            description,
+        )
 
         assert habit is not None
         assert habit.user_id == user.id
@@ -70,16 +74,21 @@ class TestCreateHabit:
 
     def test_create_habit_duplicate_name(self, user, habit_service):
         name = random_habit_name()
-        habit_service.create_habit(user.id, name, None)
+
+        HabitFactory(user=user, name=name)
 
         with pytest.raises(HabitAlreadyExistsError):
             habit_service.create_habit(user.id, name, None)
 
     def test_same_name_different_users_ok(self, habit_service, user, other_user):
-        h1 = habit_service.create_habit(user.id, random_habit_name(), None)
-        h2 = habit_service.create_habit(other_user.id, random_habit_name(), None)
+        name = random_habit_name()
 
-        assert h1.id != h2.id
+        HabitFactory(user=user, name=name)
+
+        habit = habit_service.create_habit(other_user.id, name, None)
+
+        assert habit.user_id == other_user.id
+        assert habit.name == name
 
 
 class TestGetHabit:
@@ -94,13 +103,12 @@ class TestGetHabit:
 
     def test_missing_id_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
-            habit_service.get_habit(user.id, 123)
+            habit_service.get_habit(user.id, 999999)
 
 
 class TestGetHabits:
     def test_get_habit(self, user, habit_service):
-        for _ in range(5):
-            habit_service.create_habit(user.id, random_habit_name(), None)
+        HabitFactory.create_batch(5, user=user)
 
         result = habit_service.get_habits(user.id, limit=2, offset=0)
 
@@ -110,8 +118,7 @@ class TestGetHabits:
         assert result["offset"] == 0
 
     def test_total_reflects_all_habit(self, habit_service, user):
-        for _ in range(7):
-            habit_service.create_habit(user.id, random_habit_name(), None)
+        HabitFactory.create_batch(7, user=user)
 
         result = habit_service.get_habits(user.id, limit=3, offset=0)
 
@@ -126,8 +133,10 @@ class TestGetHabits:
 
 
 class TestUpdateHabit:
-    def test_updates_name(self, habit_service, user, habit):
-        updated = habit_service.update_habit(user.id, habit.id, {"name": "New name"})
+    def test_updates_name(self, habit_service, habit):
+        updated = habit_service.update_habit(
+            habit.user_id, habit.id, {"name": "New name"}
+        )
 
         assert updated.name == "New name"
 
@@ -146,8 +155,8 @@ class TestUpdateHabit:
         assert updated.name == "Valid"
 
     def test_duplicate_name_raises(self, habit_service, user):
-        habit_service.create_habit(user.id, "ABC", None)
-        habit = habit_service.create_habit(user.id, "BCD", None)
+        HabitFactory(user=user, name="ABC")
+        habit = HabitFactory(user=user, name="BCD")
 
         with pytest.raises(HabitAlreadyExistsError):
             habit_service.update_habit(user.id, habit.id, {"name": "ABC"})
@@ -162,11 +171,11 @@ class TestUpdateHabit:
 
 
 class TestDeleteHabit:
-    def test_deletes_habit(self, habit_service, user, habit):
-        habit_service.delete_habit(user.id, habit.id)
+    def test_deletes_habit(self, habit_service, habit):
+        habit_service.delete_habit(habit.user_id, habit.id)
 
         with pytest.raises(NotFoundError):
-            habit_service.get_habit(user.id, habit.id)
+            habit_service.get_habit(habit.user_id, habit.id)
 
     def test_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
@@ -174,21 +183,21 @@ class TestDeleteHabit:
 
     def test_missing_habit_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
-            habit_service.delete_habit(user.id, 123)
+            habit_service.delete_habit(user.id, 999999)
 
 
 class TestMarkDone:
-    def test_marks_done_creates_log(self, habit_service, user, habit):
-        log = habit_service.mark_done(user.id, habit.id)
+    def test_marks_done_creates_log(self, habit_service, habit):
+        log = habit_service.mark_done(habit.user_id, habit.id)
 
         assert log is not None
         assert log.date == date.today()
 
-    def test_mark_done_twice_raises(self, habit_service, user, habit):
-        habit_service.mark_done(user.id, habit.id)
+    def test_mark_done_twice_raises(self, habit_service, habit):
+        habit_service.mark_done(habit.user_id, habit.id)
 
         with pytest.raises(HabitAlreadyMarkedError):
-            habit_service.mark_done(user.id, habit.id)
+            habit_service.mark_done(habit.user_id, habit.id)
 
     def test_mark_done_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
@@ -200,15 +209,15 @@ class TestMarkDone:
 
 
 class TestUndoDone:
-    def test_undo_done(self, habit_service, user, habit):
-        habit_service.mark_done(user.id, habit.id)
-        result = habit_service.undo_done(user.id, habit.id)
+    def test_undo_done(self, habit_service, habit):
+        habit_service.mark_done(habit.user_id, habit.id)
+        result = habit_service.undo_done(habit.user_id, habit.id)
 
         assert result is True
 
-    def test_undo_without_mark_raises(self, habit_service, user, habit):
+    def test_undo_without_mark_raises(self, habit_service, habit):
         with pytest.raises(HabitNotMarkedError):
-            habit_service.undo_done(user.id, habit.id)
+            habit_service.undo_done(habit.user_id, habit.id)
 
     def test_undo_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
@@ -226,59 +235,70 @@ class TestGetStats:
         assert len(stats["last_7_days"]) == 7
         assert all(not d["done"] for d in stats["last_7_days"])
 
-    def test_current_streak_one_day(self, habit_service, user, habit):
-        habit_service.mark_done(user.id, habit.id)
+    def test_current_streak_one_day(self, habit_service, habit):
+        HabitLogFactory(habit=habit, date=date.today())
 
-        stats = habit_service.get_stats(user.id, habit.id)
+        stats = habit_service.get_stats(habit.user_id, habit.id)
 
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 1
 
-    def test_current_streak_consecutive_days(
-        self, habit_service, user, habit, freeze_time, base_time
-    ):
+    def test_current_streak_consecutive_days(self, habit_service, user, habit):
+        now = date.today()
         for i in range(3):
-            with freeze_time(base_time - timedelta(days=2 - i)):
-                habit_service.mark_done(user.id, habit.id)
+            HabitLogFactory(
+                habit=habit,
+                date=now - timedelta(days=2 - i),
+            )
 
-        with freeze_time(base_time):
-            stats = habit_service.get_stats(user.id, habit.id)
+        stats = habit_service.get_stats(user.id, habit.id)
 
         assert stats["current_streak"] == 3
         assert stats["best_streak"] == 3
 
-    def test_streak_broken_by_gap(
-        self, habit_service, user, habit, freeze_time, base_time
-    ):
-        with freeze_time(base_time - timedelta(days=3)):
-            habit_service.mark_done(user.id, habit.id)
-        with freeze_time(base_time - timedelta(days=2)):
-            habit_service.mark_done(user.id, habit.id)
+    def test_streak_broken_by_gap(self, habit_service, habit):
+        HabitLogFactory(
+            habit=habit,
+            date=date.today() - timedelta(days=3),
+        )
 
-        with freeze_time(base_time):
-            habit_service.mark_done(user.id, habit.id)
-            stats = habit_service.get_stats(user.id, habit.id)
+        HabitLogFactory(
+            habit=habit,
+            date=date.today() - timedelta(days=2),
+        )
+
+        HabitLogFactory(
+            habit=habit,
+            date=date.today(),
+        )
+
+        stats = habit_service.get_stats(habit.user_id, habit.id)
 
         assert stats["current_streak"] == 1
         assert stats["best_streak"] == 2
 
-    def test_completion_30_days(self, habit_service, user, habit):
-        habit_service.mark_done(user.id, habit.id)
+    def test_completion_30_days(self, habit_service, habit):
+        HabitLogFactory(
+            habit=habit,
+            date=date.today(),
+        )
 
-        stats = habit_service.get_stats(user.id, habit.id)
+        stats = habit_service.get_stats(habit.user_id, habit.id)
 
         assert stats["completion_last_30_days"] == pytest.approx(1 / 30 * 100)
 
-    def test_completion_excludes_out_of_window(
-        self, habit_service, user, habit, freeze_time, base_time
-    ):
-        with freeze_time(base_time - timedelta(days=7)):
-            habit_service.mark_done(user.id, habit.id)
-        with freeze_time(base_time - timedelta(days=6)):
-            habit_service.mark_done(user.id, habit.id)
+    def test_completion_excludes_out_of_window(self, habit_service, habit):
+        HabitLogFactory(
+            habit=habit,
+            date=date.today() - timedelta(days=7),
+        )
 
-        with freeze_time(base_time):
-            stats = habit_service.get_stats(user.id, habit.id)
+        HabitLogFactory(
+            habit=habit,
+            date=date.today() - timedelta(days=6),
+        )
+
+        stats = habit_service.get_stats(habit.user_id, habit.id)
 
         assert stats["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
 
@@ -321,23 +341,23 @@ class TestGetStats:
 
 
 class TestGetHeatmap:
-    def test_returns_30_entries(self, habit_service, user, habit):
-        result = habit_service.get_heatmap(user.id, habit.id)
+    def test_returns_30_entries(self, habit_service, habit):
+        result = habit_service.get_heatmap(habit.user_id, habit.id)
 
         assert len(result) == 30
 
-    def test_logged_day_is_done(
-        self, habit_service, user, habit, freeze_time, base_time
-    ):
-        today = date.today().isoformat()
-        habit_service.mark_done(user.id, habit.id)
-        result = habit_service.get_heatmap(user.id, habit.id)
-        today_entry = next(r for r in result if r["date"] == today)
+    def test_logged_day_is_done(self, habit_service, habit):
+        today = date.today()
+        HabitLogFactory(habit=habit, date=today)
+
+        result = habit_service.get_heatmap(habit.user_id, habit.id)
+
+        today_entry = next(r for r in result if r["date"] == today.isoformat())
 
         assert today_entry["done"] is True
 
-    def test_empty_days_are_not_done(self, habit_service, user, habit):
-        result = habit_service.get_heatmap(user.id, habit.id)
+    def test_empty_days_are_not_done(self, habit_service, habit):
+        result = habit_service.get_heatmap(habit.user_id, habit.id)
 
         assert all(not r["done"] for r in result)
 

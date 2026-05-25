@@ -1,30 +1,34 @@
 import pytest
-from datetime import timedelta
+from datetime import timedelta, date
 
 from app.core.exceptions import HabitAlreadyMarkedError
 from app.services.dashboard_service import DashboardService
 from app.services.habit_service import HabitService
 from app.repositories.habit_repository import HabitRepository
-from app.repositories.user_repository import UserRepository
-from tests.utils.helpers import random_habit_name, random_email
+from tests.factories.habit_factory import HabitFactory
+from tests.factories.log_factory import HabitLogFactory
+from tests.factories.user_factory import UserFactory
+from tests.utils.helpers import random_habit_name
 
 
 @pytest.fixture
-def user(db):
-    repo = UserRepository(db)
-    from app.core.security import hash_password
-
-    return repo.create_user(random_email(), hash_password("123456"))
+def user():
+    return UserFactory()
 
 
 @pytest.fixture
-def dashboard(db):
-    return DashboardService(HabitRepository(db))
+def other_user():
+    return UserFactory()
 
 
 @pytest.fixture
 def habits(db):
     return HabitService(HabitRepository(db))
+
+
+@pytest.fixture
+def dashboard(db):
+    return DashboardService(HabitRepository(db))
 
 
 class TestDashboardEmpty:
@@ -40,11 +44,13 @@ class TestDashboardEmpty:
 
         assert set(stats.keys()) == {"total_habits", "completed_today", "best_streak"}
 
-    def test_deleted_habit_not_in_stats(self, user, dashboard, habits):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
-        habits.mark_done(user.id, habit.id)
+    def test_deleted_habit_not_in_stats(self, user, dashboard, db):
+        habit = HabitFactory(user=user)
 
-        habits.delete_habit(user.id, habit.id)
+        HabitLogFactory(habit=habit, date=date.today())
+
+        db.delete(habit)
+        db.commit()
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -54,9 +60,8 @@ class TestDashboardEmpty:
 
 
 class TestTotalHabits:
-    def test_count_habits(self, user, dashboard, habits):
-        for _ in range(3):
-            habits.create_habit(user.id, random_habit_name(), None)
+    def test_count_habits(self, user, dashboard):
+        HabitFactory.create_batch(3, user=user)
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -64,30 +69,31 @@ class TestTotalHabits:
         assert stats["completed_today"] == 0
         assert stats["best_streak"] == 0
 
-    def test_does_not_count_other_user_habits(self, db, dashboard, habits):
-        repo = UserRepository(db)
-        from app.core.security import hash_password
+    def test_does_not_count_other_user_habits(self, user, other_user, dashboard):
+        HabitFactory.create_batch(2, user=user)
 
-        user1 = repo.create_user(random_email(), hash_password("123456"))
-        user2 = repo.create_user(random_email(), hash_password("123456"))
+        HabitFactory(user=other_user)
 
-        habits.create_habit(user1.id, random_habit_name(), None)
-        habits.create_habit(user1.id, random_habit_name(), None)
-        habits.create_habit(user2.id, random_habit_name(), None)
-
-        stats = dashboard.get_dashboard_stats(user1.id)
+        stats = dashboard.get_dashboard_stats(user.id)
 
         assert stats["total_habits"] == 2
 
 
 class TestCompletedToday:
-    def test_completed_today_multiple(self, user, dashboard, habits):
-        h1 = habits.create_habit(user.id, random_habit_name(), None)
-        h2 = habits.create_habit(user.id, random_habit_name(), None)
-        habits.create_habit(user.id, random_habit_name(), None)
+    def test_count_habits(self, user, dashboard):
+        HabitFactory.create_batch(3, user=user)
 
-        habits.mark_done(user.id, h1.id)
-        habits.mark_done(user.id, h2.id)
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        assert stats["total_habits"] == 3
+        assert stats["completed_today"] == 0
+        assert stats["best_streak"] == 0
+
+    def test_completed_today_multiple(self, user, dashboard):
+        habits = HabitFactory.create_batch(3, user=user)
+
+        HabitLogFactory(habit=habits[0], date=date.today())
+        HabitLogFactory(habit=habits[1], date=date.today())
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -95,8 +101,8 @@ class TestCompletedToday:
         assert stats["best_streak"] == 1
         assert stats["total_habits"] == 3
 
-    def test_completed_today_none(self, user, dashboard, habits):
-        habits.create_habit(user.id, random_habit_name(), None)
+    def test_completed_today_none(self, user, dashboard):
+        HabitFactory(user=user)
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -104,8 +110,8 @@ class TestCompletedToday:
         assert stats["best_streak"] == 0
         assert stats["total_habits"] == 1
 
-    def test_completed_today_duplicate_mark(self, user, dashboard, habits):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
+    def test_completed_today_duplicate_mark(self, user, habits, dashboard):
+        habit = HabitFactory(user=user)
 
         habits.mark_done(user.id, habit.id)
 
@@ -113,20 +119,21 @@ class TestCompletedToday:
             habits.mark_done(user.id, habit.id)
 
         stats = dashboard.get_dashboard_stats(user.id)
+
         assert stats["completed_today"] == 1
 
     def test_mark_done_after_duplicate_still_works(self, user, habits):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
+        habit = HabitFactory(user=user)
 
         habits.mark_done(user.id, habit.id)
 
         with pytest.raises(HabitAlreadyMarkedError):
             habits.mark_done(user.id, habit.id)
 
-            new_habit = habits.create_habit(user.id, random_habit_name(), None)
+        new_habit = HabitFactory(user=user)
 
-            assert new_habit.id is not None
-            assert new_habit.id != habit.id
+        assert new_habit.id is not None
+        assert new_habit.id != habit.id
 
     def test_mark_done_midnight_boundary(
         self, user, habits, dashboard, freeze_time, base_time
@@ -147,7 +154,7 @@ class TestCompletedToday:
     def test_yesterday_completion_not_counted(
         self, user, dashboard, habits, freeze_time, base_time
     ):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
+        habit = HabitFactory(user=user)
 
         with freeze_time(base_time - timedelta(days=1)):
             habits.mark_done(user.id, habit.id)
@@ -160,10 +167,10 @@ class TestCompletedToday:
 
 
 class TestBestStreak:
-    def test_best_streak_single_habits(
+    def test_best_streak_single_habit(
         self, user, dashboard, habits, freeze_time, base_time
     ):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
+        habit = HabitFactory(user=user)
 
         with freeze_time(base_time - timedelta(days=2)):
             habits.mark_done(user.id, habit.id)
@@ -178,25 +185,21 @@ class TestBestStreak:
 
         assert stats["best_streak"] == 3
 
-    def test_best_streak_across_habits(self, db, dashboard, freeze_time, base_time):
-        repo = UserRepository(db)
-        from app.core.security import hash_password
+    def test_best_streak_across_habits(
+        self, user, dashboard, habits, freeze_time, base_time
+    ):
+        h1 = HabitFactory(user=user)
+        h2 = HabitFactory(user=user)
 
-        user = repo.create_user(random_email(), hash_password("123456"))
-        habit_svc = HabitService(HabitRepository(db))
-
-        h1 = habit_svc.create_habit(user.id, random_habit_name(), None)
-        h2 = habit_svc.create_habit(user.id, random_habit_name(), None)
-
-        # h1: 2 days streak
+        # h1: 3 days streak
         for i in range(3):
             with freeze_time(base_time - timedelta(days=i)):
-                habit_svc.mark_done(user.id, h1.id)
+                habits.mark_done(user.id, h1.id)
 
         # h2: 5 days streak
         for i in range(5):
             with freeze_time(base_time - timedelta(days=i)):
-                habit_svc.mark_done(user.id, h2.id)
+                habits.mark_done(user.id, h2.id)
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -205,7 +208,7 @@ class TestBestStreak:
     def test_best_streak_with_gap(
         self, user, dashboard, habits, freeze_time, base_time
     ):
-        habit = habits.create_habit(user.id, random_habit_name(), None)
+        habit = HabitFactory(user=user)
 
         with freeze_time(base_time - timedelta(days=3)):
             habits.mark_done(user.id, habit.id)
@@ -218,8 +221,8 @@ class TestBestStreak:
 
         assert stats["best_streak"] == 2
 
-    def test_best_streak_no_logs(self, user, dashboard, habits):
-        habits.create_habit(user.id, random_habit_name(), None)
+    def test_best_streak_no_logs(self, user, dashboard):
+        HabitFactory(user=user)
 
         stats = dashboard.get_dashboard_stats(user.id)
 

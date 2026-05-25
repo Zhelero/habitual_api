@@ -6,10 +6,14 @@ from freezegun import freeze_time as _freeze_time
 from datetime import datetime
 
 from app.core.config import settings
+from app.core.jwt import create_access_token
 from app.main import app
 from app.db.base import Base
 from app.db.deps import get_db
 from tests.utils.helpers import build_service
+from tests.factories.user_factory import UserFactory
+from tests.factories.habit_factory import HabitFactory
+from tests.factories.log_factory import HabitLogFactory
 
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 TestingSessionLocal = sessionmaker(
@@ -62,26 +66,6 @@ def client(db):
 
 
 @pytest.fixture
-def user_token(client):
-    import uuid
-
-    email = f"{uuid.uuid4()}@test.com"
-    password = "123456"
-
-    client.post("/auth/register/", json={"email": email, "password": password})
-
-    response = client.post("/auth/login/", json={"email": email, "password": password})
-
-    assert response.status_code == 200
-    return response.json()["access_token"]
-
-
-@pytest.fixture
-def auth_headers(user_token):
-    return {"Authorization": f"Bearer {user_token}"}
-
-
-@pytest.fixture
 def mock_session(mocker):
     mock = mocker.Mock()
     mocker.patch("app.db.session.SessionLocal", return_value=mock)
@@ -104,3 +88,37 @@ def freeze_time():
 @pytest.fixture
 def base_time():
     return datetime(2026, 2, 1)
+
+
+@pytest.fixture(autouse=True)
+def setup_factories(db):
+    for factory_cls in (UserFactory, HabitFactory, HabitLogFactory):
+        factory_cls._meta.sqlalchemy_session = db
+
+
+@pytest.fixture
+def auth_headers(user):
+    token = create_access_token({"sub": str(user.id)})
+
+    return {
+        "Authorization": f"Bearer {token}",
+    }
+
+
+@pytest.fixture
+def auth_tokens(service, user):
+    return service.login(user.email, "123456")
+
+
+@pytest.fixture
+def user(db):
+    user = UserFactory()
+    db.commit()
+    return user
+
+
+@pytest.fixture
+def habit(user, db):
+    habit = HabitFactory(user=user)
+    db.commit()
+    return habit

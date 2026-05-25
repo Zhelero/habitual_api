@@ -8,51 +8,71 @@ from tests.utils.helpers import (
 )
 
 
-def test_dashboard_stats(client, auth_headers):
-    response = client.get("/dashboard/", headers=auth_headers)
+class TestDashboard:
+    def test_dashboard_stats(self, client, auth_headers):
+        response = client.get("/dashboard/", headers=auth_headers)
 
-    assert response.status_code == 200
-    data = response.json()
+        assert response.status_code == 200
+        data = response.json()
 
-    assert set(data.keys()) == {"total_habits", "completed_today", "best_streak"}
+        assert set(data.keys()) == {"total_habits", "completed_today", "best_streak"}
 
-    assert isinstance(data["total_habits"], int)
-    assert isinstance(data["completed_today"], int)
-    assert isinstance(data["best_streak"], int)
+        assert isinstance(data["total_habits"], int)
+        assert isinstance(data["completed_today"], int)
+        assert isinstance(data["best_streak"], int)
 
+    def test_dashboard_with_data(self, client, auth_headers):
+        habits = [create_habit(client, auth_headers) for _ in range(3)]
 
-def test_dashboard_with_data(client, auth_headers):
-    habits = [create_habit(client, auth_headers) for _ in range(3)]
+        habit_id = habits[0]["id"]
 
-    habit_id = habits[0]["id"]
+        client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
 
-    client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+        response = client.get("/dashboard/", headers=auth_headers)
+        assert response.status_code == 200
 
-    response = client.get("/dashboard/", headers=auth_headers)
-    assert response.status_code == 200
+        data = response.json()
 
-    data = response.json()
+        assert data["total_habits"] == 3
+        assert data["completed_today"] == 1
+        assert data["best_streak"] == 1
 
-    assert data["total_habits"] == 3
-    assert data["completed_today"] == 1
-    assert data["best_streak"] == 1
+    def test_dashboard_empty(self, client, auth_headers):
+        response = client.get("/dashboard/", headers=auth_headers)
 
+        assert response.status_code == 200
 
-def test_dashboard_empty(client, auth_headers):
-    response = client.get("/dashboard/", headers=auth_headers)
+        data = response.json()
+        assert data["total_habits"] == 0
+        assert data["completed_today"] == 0
+        assert data["best_streak"] == 0
 
-    assert response.status_code == 200
+    def test_dashboard_no_token(self, client):
+        response = client.get("/dashboard/")
 
-    data = response.json()
-    assert data["total_habits"] == 0
-    assert data["completed_today"] == 0
-    assert data["best_streak"] == 0
+        assert response.status_code == 401
 
+    def test_dashboard_only_current_user_data(self, client):
+        user1 = register_user(client)
+        user2 = register_user(client)
 
-def test_dashboard_no_token(client):
-    response = client.get("/dashboard/")
+        h1 = create_habit(client, auth(user1["access_token"]))
+        create_habit(client, auth(user2["access_token"]))
 
-    assert response.status_code == 401
+        client.post(
+            f"/habits/{h1['id']}/done/",
+            headers=auth(user1["access_token"]),
+        )
+
+        response = client.get(
+            "/dashboard/",
+            headers=auth(user1["access_token"]),
+        )
+
+        data = response.json()
+
+        assert data["total_habits"] == 1
+        assert data["completed_today"] == 1
 
 
 class TestAuth:
@@ -65,10 +85,30 @@ class TestAuth:
     def test_blacklisted_token(self, client):
         user = register_user(client)
         token = user["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = auth(token)
 
         client.post("/auth/logout/", headers=headers)
         response = client.get("/dashboard/", headers=headers)
+
+        assert response.status_code == 401
+
+    def test_missing_token(self, client):
+        response = client.get("/dashboard/")
+        assert response.status_code == 401
+
+    def test_wrong_auth_scheme(self, client):
+        response = client.get(
+            "/dashboard/",
+            headers={"Authorization": "Token abc123"},
+        )
+
+        assert response.status_code == 401
+
+    def test_empty_bearer_token(self, client):
+        response = client.get(
+            "/dashboard/",
+            headers={"Authorization": "Bearer "},
+        )
 
         assert response.status_code == 401
 
@@ -107,6 +147,22 @@ class TestIsolation:
 
         assert data2["total_habits"] == 0
         assert data2["completed_today"] == 0
+
+    def test_user_cannot_mark_other_users_habit_done(self, client):
+        user1 = register_user(client)
+        user2 = register_user(client)
+
+        h1 = auth(user1["access_token"])
+        h2 = auth(user2["access_token"])
+
+        habit = create_habit(client, h1)
+
+        response = client.post(
+            f"/habits/{habit['id']}/done/",
+            headers=h2,
+        )
+
+        assert response.status_code == 404
 
 
 class TestCompletedToday:
@@ -169,74 +225,86 @@ class TestCompletedToday:
         assert data["completed_today"] == 1
         assert data["best_streak"] == 1
 
+    class TestBestStreak:
+        def test_best_streak_multi_day(self, client, freeze_time, base_time):
+            email = random_email()
+            password = "123456"
 
-class TestBestStreak:
-    def test_best_streak_multi_day(self, client, freeze_time, base_time):
-        email = random_email()
-        password = "123456"
+            register_user(client, email, password)
+            auth_headers = get_auth_headers(client, email, password)
+            habit = create_habit(client, auth_headers)
 
-        register_user(client, email, password)
-        auth_headers = get_auth_headers(client, email, password)
-        habit = create_habit(client, auth_headers)
+            for i in range(3):
+                with freeze_time(base_time - timedelta(days=i)):
+                    auth_headers = get_auth_headers(client, email, password)
+                    client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
-        for i in range(3):
-            with freeze_time(base_time - timedelta(days=i)):
-                auth_headers = get_auth_headers(client, email, password)
-                client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+            auth_headers = get_auth_headers(client, email, password)
+            data = client.get("/dashboard/", headers=auth_headers).json()
 
-        auth_headers = get_auth_headers(client, email, password)
-        data = client.get("/dashboard/", headers=auth_headers).json()
-        print(data)
-        assert data["total_habits"] == 1
-        assert data["best_streak"] == 3
+            assert data["total_habits"] == 1
+            assert data["best_streak"] == 3
 
-    def test_best_streak_is_max_across_habits(
-        self, client, auth_headers, freeze_time, base_time
-    ):
-        email1 = random_email()
-        email2 = random_email()
-        password = "123456"
+        def test_best_streak_not_affected_by_other_users(
+            self, client, auth_headers, freeze_time, base_time
+        ):
+            email1 = random_email()
+            email2 = random_email()
+            password = "123456"
 
-        register_user(client, email1, password)
-        register_user(client, email2, password)
+            register_user(client, email1, password)
+            register_user(client, email2, password)
 
-        auth_headers1 = get_auth_headers(client, email1, password)
-        habit1 = create_habit(client, auth_headers1)
-        client.post(f"/habits/{habit1['id']}/done/", headers=auth_headers1)
+            auth_headers1 = get_auth_headers(client, email1, password)
+            habit1 = create_habit(client, auth_headers1)
+            client.post(f"/habits/{habit1['id']}/done/", headers=auth_headers1)
 
-        auth_headers2 = get_auth_headers(client, email2, password)
-        habit2 = create_habit(client, auth_headers2)
+            auth_headers2 = get_auth_headers(client, email2, password)
+            habit2 = create_habit(client, auth_headers2)
 
-        for i in range(4):
-            with freeze_time(base_time - timedelta(days=i)):
-                auth_headers = get_auth_headers(client, email2, password)
-                client.post(f"/habits/{habit2['id']}/done/", headers=auth_headers)
+            for i in range(4):
+                with freeze_time(base_time - timedelta(days=i)):
+                    auth_headers = get_auth_headers(client, email2, password)
+                    client.post(f"/habits/{habit2['id']}/done/", headers=auth_headers)
 
-        auth_headers2 = get_auth_headers(client, email2, password)
-        data = client.get("/dashboard/", headers=auth_headers2).json()
-        print(data)
-        assert data["total_habits"] == 1
-        assert data["best_streak"] == 4
+            auth_headers2 = get_auth_headers(client, email2, password)
+            data = client.get("/dashboard/", headers=auth_headers2).json()
 
-    def test_delete_habit_affects_best_streak(self, client, auth_headers):
-        habit = create_habit(client, auth_headers)
-        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+            assert data["total_habits"] == 1
+            assert data["best_streak"] == 4
 
-        client.delete(f"/habits/{habit['id']}/done/", headers=auth_headers)
+        def test_undo_resets_best_streak(self, client, auth_headers):
+            habit = create_habit(client, auth_headers)
+            client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
-        data = client.get("/dashboard/", headers=auth_headers).json()
+            client.delete(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
-        assert data["total_habits"] == 1
-        assert data["completed_today"] == 0
-        assert data["best_streak"] == 0
+            data = client.get("/dashboard/", headers=auth_headers).json()
+
+            assert data["total_habits"] == 1
+            assert data["completed_today"] == 0
+            assert data["best_streak"] == 0
 
 
 class TestTotalHabits:
     def test_deleted_habit_not_counted(self, client, auth_headers):
         habits = [create_habit(client, auth_headers) for _ in range(4)]
 
-        client.delete(f"/habits/{habits[0]['id']}/", headers=auth_headers)
+        response = client.get("/dashboard/", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["total_habits"] == 4
 
-        data = client.get("/dashboard/", headers=auth_headers).json()
+        delete_response = client.delete(
+            f"/habits/{habits[0]['id']}/",
+            headers=auth_headers,
+        )
+        assert delete_response.status_code == 204
 
-        assert data["total_habits"] == 3
+        response = client.get("/dashboard/", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["total_habits"] == 3
+
+
+# HELPERS
+def auth(token):
+    return {"Authorization": f"Bearer {token}"}
