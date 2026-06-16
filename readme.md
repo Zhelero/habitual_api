@@ -13,7 +13,6 @@ with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pip
 ![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
 
-
 ---
 
 ## Why this project
@@ -28,7 +27,7 @@ This project focuses on:
 - clean service/repository architecture
 - high test coverage
 
-It also demonstrates how a test suite evolves alongside the application 
+It also demonstrates how a test suite evolves alongside the application
 and requires its own architecture.
 
 ---
@@ -48,8 +47,10 @@ and requires its own architecture.
 - Structured error handling
 - Layered architecture (API / Service / Repository)
 - 98% test coverage
+- React UI — [habitual-ui](https://github.com/Zhelero/habitual-ui)
 
 ---
+
 ## Tech Stack
 
 | Layer      | Technology                              |
@@ -76,7 +77,7 @@ The project follows a layered architecture:
 - Repository layer — database interaction
 - Core layer — auth, security, configuration
 
-This separation allows independent testing of each layer 
+This separation allows independent testing of each layer
 and keeps business logic isolated from the framework.
 
 ---
@@ -102,17 +103,37 @@ app/
 │   ├── exceptions.py # custom exceptions
 │   └── handlers.py   # exception handlers
 └── main.py
-
 ```
+
+---
+
+## Frontend
+
+A React UI for this API is available at [habitual-ui](https://github.com/Zhelero/habitual-ui).
+
+Built with React + Vite + Tailwind CSS. Features login, registration, habit management, streak tracking and a 30-day heatmap. Connects to this API running on `http://localhost:8000`.
+
+To run the full stack locally, start the API first, then the UI:
+
+```bash
+# Terminal 1 — API
+uvicorn app.main:app --reload
+
+# Terminal 2 — UI
+cd habitual-ui
+npm install
+npm run dev
+```
+
+The UI will be available at `http://localhost:5173`.
+
 ---
 
 ## Authentication Flow
 
 ### Register
 
-
 POST /auth/register
-
 
 Returns:
 
@@ -124,6 +145,7 @@ Returns:
   "user_id": 1
 }
 ```
+
 ### Login
 POST /auth/login
 
@@ -135,10 +157,8 @@ POST /auth/refresh
 
 ### Logout
 POST /auth/logout
-
 - token added to blacklist
 - reuse prevented
-
 
 ---
 
@@ -167,7 +187,9 @@ Returns:
   "best_streak": 12
 }
 ```
+
 ---
+
 ## Request Logging
 
 ### Middleware logs:
@@ -177,6 +199,7 @@ Returns:
 127.0.0.1 POST /auth/login -> 401 (3ms) [Mozilla/...]
 127.0.0.1 POST /auth/refresh -> 500 (2ms) [pytest]
 ```
+
 Logged fields:
 
 - client IP
@@ -187,6 +210,7 @@ Logged fields:
 - user-agent
 
 ---
+
 ### Logs
 
 By default logs are written to:
@@ -198,6 +222,7 @@ Example:
 ```
 docker compose logs -f app
 ```
+
 Logs include:
 
 - request logs
@@ -205,7 +230,9 @@ Logs include:
 - auth events
 - blacklist operations
 - startup info
+
 ---
+
 ## Getting Started
 
 ### 1. Clone and install
@@ -320,7 +347,9 @@ curl -X POST http://localhost:8000/auth/refresh/ \
   -H "Content-Type: application/json" \
   -d '{"refresh_token": "eyJ..."}'
 ```
+
 ---
+
 ### Database
 
 The application uses PostgreSQL in production and SQLite for tests.
@@ -333,6 +362,7 @@ alembic upgrade head
 ```
 
 ---
+
 ## CI
 
 GitHub Actions pipeline:
@@ -346,6 +376,7 @@ Runs on:
 - push
 - pull request
 
+---
 
 ## Testing
 
@@ -354,7 +385,7 @@ pytest
 ```
 
 ```
-295 passed in  91.72s
+295 passed in 91.72s
 ```
 
 ## Test Coverage
@@ -380,7 +411,7 @@ The test suite verifies:
 - user data isolation
 - statistics correctness
 
-The growing complexity of tests led to recognizing the need 
+The growing complexity of tests led to recognizing the need
 for test architecture refactoring to support further scaling.
 
 ---
