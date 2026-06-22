@@ -5,6 +5,7 @@ from app.repositories.habit_repository import HabitRepository
 from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password
 from tests.utils.helpers import random_habit_name, random_email
+from app.core.enum import HabitFilter
 
 # Fixtures
 
@@ -192,34 +193,120 @@ class TestUpdateHabit:
         assert result is not None
 
 
-class TestDeleteHabit:
-    def test_deletes_and_return_true(self, user, habit, repo):
-        result = repo.delete_habit(user.id, habit.id)
+class TestArchiveHabit:
+    def test_archives_habit(self, user, habit, repo):
+        repo.archive_habit(habit)
 
-        assert result is True
-        assert repo.get_habit_by_id(user.id, habit.id) is None
+        result = repo.get_habit_by_id(user.id, habit.id)
 
-    def test_wrong_user_returns_false(self, other_user, habit, repo):
-        result = repo.delete_habit(other_user.id, habit.id)
+        assert result.is_archived is True
 
-        assert result is False
+    def test_archived_habit_excluded_from_paginated_list(self, user, habit, repo):
+        repo.archive_habit(habit)
 
-    def test_missing_habit_returns_false(self, user, repo):
-        result = repo.delete_habit(user.id, 123)
+        result = repo.get_habits_paginated(user.id, limit=20, offset=0)
 
-        assert result is False
+        assert habit not in result
 
-    def test_delete_cascades_to_logs(self, user, habit, repo):
-        today = date.today()
-        repo.add_log(user.id, habit.id, today)
+    def test_archived_habit_included_when_requested(self, user, habit, repo):
+        repo.archive_habit(habit)
 
-        repo.delete_habit(user.id, habit.id)
+        result = repo.get_habits_paginated(
+            user.id, limit=20, offset=0, filter=HabitFilter.ALL
+        )
 
-        habit = repo.get_habit_by_id(user.id, habit.id)
-        assert habit is None
+        assert habit in result
 
-        logs = repo.get_all_logs(user.id)
-        assert logs == []
+    def test_archived_habit_excluded_from_count(self, user, habit, repo):
+        repo.archive_habit(habit)
+
+        count = repo.count_habits(user.id)
+
+        assert count == 0
+
+    def test_archived_habit_excluded_from_all_habits(self, user, habit, repo):
+        repo.archive_habit(habit)
+
+        result = repo.get_all_habits(user.id)
+
+        assert habit not in result
+
+    def test_archived_habit_included_in_count_when_requested(self, user, habit, repo):
+        repo.archive_habit(habit)
+
+        count = repo.count_habits(user.id, filter=HabitFilter.ALL)
+
+        assert count == 1
+
+    def test_archived_habit_excluded_from_count_explicit_false(self, user, habit, repo):
+        repo.archive_habit(habit)
+
+        count = repo.count_habits(user.id, filter=HabitFilter.ACTIVE)
+
+        assert count == 0
+
+    def test_archived_habit_still_accessible_by_id(self, user, habit, repo):
+        repo.archive_habit(habit)
+
+        result = repo.get_habit_by_id(user.id, habit.id)
+
+        assert result is not None
+        assert result.is_archived is True
+
+    def test_archive_already_archived_habit(self, habit, repo):
+        repo.archive_habit(habit)
+
+        repo.archive_habit(habit)
+
+        assert habit.is_archived is True
+
+
+class TestRestoreHabit:
+    def test_restores_habit(self, habit, repo):
+        repo.archive_habit(habit)
+        repo.restore_habit(habit)
+
+        assert habit.is_archived is False
+
+    def test_restored_habit_appears_in_all_habits(self, user, habit, repo):
+        repo.archive_habit(habit)
+        repo.restore_habit(habit)
+
+        result = repo.get_all_habits(user.id)
+
+        assert habit in result
+
+    def test_restored_habit_appears_in_default_list(self, user, habit, repo):
+        repo.archive_habit(habit)
+        repo.restore_habit(habit)
+
+        result = repo.get_habits_paginated(user.id, limit=20, offset=0)
+
+        assert habit in result
+
+    def test_restored_habit_counted_again(self, user, habit, repo):
+        repo.archive_habit(habit)
+        repo.restore_habit(habit)
+
+        count = repo.count_habits(user.id)
+
+        assert count == 1
+
+    def test_restore_active_habit(self, habit, repo):
+        repo.restore_habit(habit)
+
+        assert habit.is_archived is False
+
+    def test_returns_only_active_habits(self, user, repo):
+        active = repo.create_habit(user.id, "active", None)
+        archived = repo.create_habit(user.id, "archived", None)
+
+        repo.archive_habit(archived)
+
+        result = repo.get_all_habits(user.id)
+
+        assert active in result
+        assert archived not in result
 
 
 class TestAddLog:

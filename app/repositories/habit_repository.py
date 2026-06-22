@@ -6,6 +6,7 @@ from sqlalchemy.sql import Select
 from sqlalchemy import select, delete, func, update, literal, cast, Date
 
 from app.db.models import Habit, HabitLog
+from app.core.enum import HabitFilter
 
 logger = logging.getLogger("app.habits.repo")
 
@@ -59,56 +60,48 @@ class HabitRepository:
 
         return updated
 
-    def get_all_habits(self, user_id: int) -> list[Habit]:
-        stmt = (
-            select(Habit)
-            .where(Habit.user_id == user_id)
-            .order_by(Habit.created_at.desc())
-        )
-        result = self.db.execute(stmt)
-        return result.scalars().all()
+    def get_all_habits(
+        self, user_id: int, filter: HabitFilter = HabitFilter.ACTIVE
+    ) -> list[Habit]:
+        conditions = self._apply_habit_filter([Habit.user_id == user_id], filter)
+
+        stmt = select(Habit).where(*conditions).order_by(Habit.created_at.desc())
+        return self.db.execute(stmt).scalars().all()
 
     def get_habit_by_id(self, user_id: int, habit_id: int) -> Habit | None:
-        stmt = select(Habit).where(
-            Habit.id == habit_id,
-            Habit.user_id == user_id,
-        )
+        stmt = select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
         result = self.db.execute(stmt)
 
         return result.scalar_one_or_none()
 
     def get_habits_paginated(
-        self, user_id: int, limit: int, offset: int
+        self,
+        user_id: int,
+        limit: int,
+        offset: int,
+        filter: HabitFilter = HabitFilter.ACTIVE,
     ) -> list[Habit]:
-        stmt = select(Habit).where(Habit.user_id == user_id).offset(offset).limit(limit)
+        conditions = self._apply_habit_filter([Habit.user_id == user_id], filter)
+
+        stmt = select(Habit).where(*conditions).offset(offset).limit(limit)
 
         return self.db.execute(stmt).scalars().all()
 
-    def count_habits(self, user_id: int) -> int:
-        stmt = select(func.count()).select_from(Habit).where(Habit.user_id == user_id)
+    def count_habits(
+        self, user_id: int, filter: HabitFilter = HabitFilter.ACTIVE
+    ) -> int:
+        conditions = self._apply_habit_filter([Habit.user_id == user_id], filter)
+
+        stmt = select(func.count()).select_from(Habit).where(*conditions)
         return self.db.execute(stmt).scalar()
 
-    def delete_habit(self, user_id: int, habit_id: int) -> bool:
-        stmt = delete(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
-        result = self.db.execute(stmt)
+    def archive_habit(self, habit: Habit) -> None:
+        habit.is_archived = True
         self.db.flush()
 
-        deleted = result.rowcount > 0
-
-        if deleted:
-            logger.info(
-                "Delete habit user_id=%s habit_id=%s",
-                user_id,
-                habit_id,
-            )
-        else:
-            logger.debug(
-                "Delete habit not found user_id=%s habit_id=%s",
-                user_id,
-                habit_id,
-            )
-
-        return deleted
+    def restore_habit(self, habit: Habit) -> None:
+        habit.is_archived = False
+        self.db.flush()
 
     # LOGS
 
@@ -267,3 +260,11 @@ class HabitRepository:
         if habit_id is not None:
             condition = condition & (HabitLog.habit_id == habit_id)
         return condition
+
+    def _apply_habit_filter(self, conditions: list, filter: HabitFilter) -> list:
+        if filter == HabitFilter.ACTIVE:
+            conditions.append(Habit.is_archived.is_(False))
+        elif filter == HabitFilter.ARCHIVED:
+            conditions.append(Habit.is_archived.is_(True))
+        # ALL — no additional condition
+        return conditions

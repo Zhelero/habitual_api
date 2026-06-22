@@ -33,6 +33,11 @@ class HabitNotMarkedError(AppError):
     detail = "Habit not marked today"
 
 
+class HabitArchivedError(AppError):
+    status_code = 409
+    detail = "Cannot modify an archived habit"
+
+
 class AtLeastOneFieldError(AppError):
     status_code = 400
     detail = "At least one field is required"

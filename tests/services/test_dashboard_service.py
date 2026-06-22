@@ -228,3 +228,61 @@ class TestBestStreak:
 
         assert stats["completed_today"] == 0
         assert stats["best_streak"] == 0
+
+
+class TestDashboardStatsWithArchivedHabits:
+    def test_archived_habit_excluded_from_total(self, user, habits, dashboard):
+        habits.create_habit(user.id, "active", None)
+        archived = habits.create_habit(user.id, "archived", None)
+        habits.archive_habit(user.id, archived.id)
+
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        assert stats["total_habits"] == 1
+
+    def test_archived_habit_excluded_from_best_streak(self, user, habits, dashboard):
+        archived = habits.create_habit(user.id, "archived", None)
+        for i in range(5):
+            HabitLogFactory(habit=archived, date=date.today() - timedelta(days=i))
+        habits.archive_habit(user.id, archived.id)
+
+        active = habits.create_habit(user.id, "active", None)
+        HabitLogFactory(habit=active, date=date.today())
+
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        # archived habit had a 5-day streak, active only 1 day
+        assert stats["best_streak"] == 1
+
+    def test_completed_today_includes_log_made_before_archiving(
+        self, user, habits, dashboard
+    ):
+        """
+        A habit marked done today and then archived still counts
+        toward completed_today — the log was created while active.
+        """
+        habit = habits.create_habit(user.id, "habit", None)
+        habits.mark_done(user.id, habit.id)
+        habits.archive_habit(user.id, habit.id)
+
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        assert stats["completed_today"] == 1
+
+    def test_dashboard_with_only_archived_habits(self, user, habits, dashboard):
+        habit = habits.create_habit(user.id, "habit", None)
+        habits.archive_habit(user.id, habit.id)
+
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        assert stats["total_habits"] == 0
+        assert stats["best_streak"] == 0
+
+    def test_restored_habit_counted_again(self, user, habits, dashboard):
+        habit = habits.create_habit(user.id, "habit", None)
+        habits.archive_habit(user.id, habit.id)
+        habits.restore_habit(user.id, habit.id)
+
+        stats = dashboard.get_dashboard_stats(user.id)
+
+        assert stats["total_habits"] == 1

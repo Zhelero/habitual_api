@@ -81,7 +81,7 @@ class HabitResponse(BaseModel):
     description: str | None = None
     created_at: datetime
     updated_at: datetime
-
+    is_archived: bool
     model_config = ConfigDict(from_attributes=True)
 
 

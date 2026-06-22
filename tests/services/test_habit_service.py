@@ -2,16 +2,18 @@ import pytest
 from datetime import timedelta, date
 
 from app.core.exceptions import (
-    HabitAlreadyMarkedError,
     NameCannotBeEmptyError,
     HabitAlreadyExistsError,
     HabitNameTooLongError,
     HabitNameTooShortError,
     NotFoundError,
     HabitNotMarkedError,
+    HabitAlreadyMarkedError,
+    HabitArchivedError,
 )
 from app.repositories.habit_repository import HabitRepository
 from app.services.habit_service import HabitService
+from app.core.enum import HabitFilter
 
 from tests.factories.habit_factory import HabitFactory
 from tests.factories.log_factory import HabitLogFactory
@@ -170,20 +172,105 @@ class TestUpdateHabit:
             habit_service.update_habit(user.id, 123, {"name": "A"})
 
 
-class TestDeleteHabit:
-    def test_deletes_habit(self, habit_service, habit):
-        habit_service.delete_habit(habit.user_id, habit.id)
+class TestArchiveHabit:
+    def test_archives_habit(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
 
-        with pytest.raises(NotFoundError):
-            habit_service.get_habit(habit.user_id, habit.id)
+        assert habit.is_archived is True
 
     def test_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
-            habit_service.delete_habit(other_user.id, habit.id)
+            habit_service.archive_habit(other_user.id, habit.id)
 
     def test_missing_habit_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
-            habit_service.delete_habit(user.id, 999999)
+            habit_service.archive_habit(user.id, 123)
+
+    def test_archive_already_archived_habit(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+        habit_service.archive_habit(user.id, habit.id)
+
+        assert habit.is_archived is True
+
+    def test_archived_habit_excluded_from_get_habits(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+
+        result = habit_service.get_habits(user.id, limit=20, offset=0)
+
+        ids = [h.id for h in result["items"]]
+        assert habit.id not in ids
+
+    def test_archived_habit_included_when_requested(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+
+        result = habit_service.get_habits(
+            user.id, limit=20, offset=0, filter=HabitFilter.ALL
+        )
+
+        ids = [h.id for h in result["items"]]
+        assert habit.id in ids
+
+    def test_archived_habit_still_accessible_via_get_habit(
+        self, habit_service, user, habit
+    ):
+        habit_service.archive_habit(user.id, habit.id)
+
+        result = habit_service.get_habit(user.id, habit.id)
+
+        assert result.id == habit.id
+        assert result.is_archived is True
+
+
+class TestRestoreHabit:
+    def test_restores_habit(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+        habit_service.restore_habit(user.id, habit.id)
+
+        assert habit.is_archived is False
+
+    def test_wrong_user_raises(self, habit_service, other_user, habit):
+        with pytest.raises(NotFoundError):
+            habit_service.restore_habit(other_user.id, habit.id)
+
+    def test_missing_habit_raises(self, habit_service, user):
+        with pytest.raises(NotFoundError):
+            habit_service.restore_habit(user.id, 123)
+
+    def test_restore_active_habit(self, habit_service, user, habit):
+        habit_service.restore_habit(user.id, habit.id)
+
+        assert habit.is_archived is False
+
+    def test_restored_habit_appears_in_get_habits(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+        habit_service.restore_habit(user.id, habit.id)
+
+        result = habit_service.get_habits(user.id, limit=20, offset=0)
+
+        ids = [h.id for h in result["items"]]
+        assert habit.id in ids
+
+
+class TestGetHabitsArchiveFilter:
+    def test_total_excludes_archived_by_default(self, habit_service, user):
+        HabitFactory(user=user, name="active")
+        archived = HabitFactory(user=user, name="archived")
+        habit_service.archive_habit(user.id, archived.id)
+
+        result = habit_service.get_habits(user.id, limit=20, offset=0)
+
+        assert result["total"] == 1
+
+    def test_total_includes_archived_when_requested(self, habit_service, user):
+        HabitFactory(user=user, name="active")
+        archived = HabitFactory(user=user, name="archived")
+        habit_service.archive_habit(user.id, archived.id)
+
+        result = habit_service.get_habits(
+            user.id, limit=20, offset=0, filter=HabitFilter.ALL
+        )
+
+        assert result["total"] == 2
 
 
 class TestMarkDone:
@@ -222,6 +309,21 @@ class TestUndoDone:
     def test_undo_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
             habit_service.undo_done(other_user.id, habit.id)
+
+
+class TestMarkDoneArchivedHabit:
+    def test_cannot_mark_done_archived_habit(self, habit_service, user, habit):
+        habit_service.archive_habit(user.id, habit.id)
+
+        with pytest.raises(HabitArchivedError):
+            habit_service.mark_done(user.id, habit.id)
+
+    def test_cannot_undo_archived_habit(self, habit_service, user, habit):
+        habit_service.mark_done(user.id, habit.id)
+        habit_service.archive_habit(user.id, habit.id)
+
+        with pytest.raises(HabitArchivedError):
+            habit_service.undo_done(user.id, habit.id)
 
 
 class TestGetStats:

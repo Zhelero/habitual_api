@@ -278,59 +278,157 @@ class TestUpdateHabit:
         assert response.status_code == 404
 
 
-class TestDeleteHabit:
-    def test_delete_habit(self, client, auth_headers, habit):
-        response = client.delete(f"/habits/{habit.id}/", headers=auth_headers)
+class TestArchiveHabit:
+    def test_archive_habit(self, client, auth_headers, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/archive/",
+            headers=auth_headers,
+        )
 
         assert response.status_code == 204
 
+    def test_archived_habit_excluded_from_list(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.get("/habits/", headers=auth_headers)
+        data = response.json()
+
+        ids = [h["id"] for h in data["items"]]
+        assert habit.id not in ids
+
+    def test_archived_habit_included_when_requested(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.get("/habits/?filter=all", headers=auth_headers)
+        data = response.json()
+
+        ids = [h["id"] for h in data["items"]]
+        assert habit.id in ids
+
+    def test_archived_habit_still_accessible_by_id(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
         response = client.get(f"/habits/{habit.id}/", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json()["is_archived"] is True
 
-    def test_deleted_habit_is_unavailable_for_all_operations(
-        self, client, auth_headers, habit
-    ):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
-        client.delete(f"/habits/{habit.id}/", headers=auth_headers)
-
-        stats = client.get(f"/habits/{habit.id}/stats/", headers=auth_headers)
-        assert stats.status_code == 404
-
-        patch = client.patch(
-            f"/habits/{habit.id}/", json={"name": "123"}, headers=auth_headers
-        )
-        assert patch.status_code == 404
-
-        deletion = client.delete(f"/habits/{habit.id}/", headers=auth_headers)
-        assert deletion.status_code == 404
-
-        mark_done = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
-        assert mark_done.status_code == 404
-
-    def test_delete_habit_wrong_id(self, client, auth_headers):
-        response = client.delete("/habits/999999/", headers=auth_headers)
+    def test_archive_nonexistent_habit(self, client, auth_headers):
+        response = client.patch("/habits/999999/archive/", headers=auth_headers)
 
         assert response.status_code == 404
 
-    def test_delete_invalid_token(self, client, habit):
-        response = client.delete(
-            f"/habits/{habit.id}/", headers={"Authorization": "Bearer wrong_token"}
+    def test_archive_habit_invalid_token(self, client, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/archive/",
+            headers={"Authorization": "Bearer wrong_token"},
         )
 
         assert response.status_code == 401
 
-    def test_delete_no_token(self, client, habit):
-        response = client.delete(f"/habits/{habit.id}/")
-        assert response.status_code == 401
-
-    def test_user_cannot_delete_other_user_habit(self, client, habit):
+    def test_user_cannot_archive_other_user_habit(self, client, habit):
         other_user = register_user(client)
         token = other_user["access_token"]
 
-        response = client.delete(f"/habits/{habit.id}/", headers=auth(token))
+        response = client.patch(f"/habits/{habit.id}/archive/", headers=auth(token))
 
         assert response.status_code == 404
+
+    def test_archive_already_archived_habit(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        assert response.status_code == 204
+
+
+class TestRestoreHabit:
+    def test_restore_habit(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.patch(f"/habits/{habit.id}/restore/", headers=auth_headers)
+
+        assert response.status_code == 204
+
+        response = client.get(
+            f"/habits/{habit.id}/",
+            headers=auth_headers,
+        )
+
+        assert response.json()["is_archived"] is False
+
+    def test_restored_habit_appears_in_list(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+        client.patch(f"/habits/{habit.id}/restore/", headers=auth_headers)
+
+        response = client.get("/habits/", headers=auth_headers)
+        data = response.json()
+
+        ids = [h["id"] for h in data["items"]]
+        assert habit.id in ids
+
+    def test_restore_active_habit(self, client, auth_headers, habit):
+        response = client.patch(f"/habits/{habit.id}/restore/", headers=auth_headers)
+
+        assert response.status_code == 204
+
+    def test_restore_nonexistent_habit(self, client, auth_headers):
+        response = client.patch("/habits/999999/restore/", headers=auth_headers)
+
+        assert response.status_code == 404
+
+    def test_restore_habit_invalid_token(self, client, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/restore/",
+            headers={"Authorization": "Bearer wrong_token"},
+        )
+
+        assert response.status_code == 401
+
+    def test_user_cannot_restore_other_user_habit(self, client, habit):
+        other_user = register_user(client)
+        token = other_user["access_token"]
+
+        response = client.patch(f"/habits/{habit.id}/restore/", headers=auth(token))
+
+        assert response.status_code == 404
+
+    def test_restore_returns_habit_to_total(self, client, auth_headers):
+        h1 = create_habit(client, auth_headers)
+
+        client.patch(
+            f"/habits/{h1['id']}/archive/",
+            headers=auth_headers,
+        )
+
+        client.patch(
+            f"/habits/{h1['id']}/restore/",
+            headers=auth_headers,
+        )
+
+        response = client.get("/habits/", headers=auth_headers)
+
+        assert response.json()["total"] == 1
+
+
+class TestListHabitsArchiveFilter:
+    def test_total_excludes_archived_by_default(self, client, auth_headers):
+        create_habit(client, auth_headers)
+        h2 = create_habit(client, auth_headers)
+
+        client.patch(f"/habits/{h2['id']}/archive/", headers=auth_headers)
+
+        response = client.get("/habits/", headers=auth_headers)
+        assert response.json()["total"] == 1
+
+    def test_total_includes_archived_when_requested(self, client, auth_headers):
+        create_habit(client, auth_headers)
+        h2 = create_habit(client, auth_headers)
+
+        client.patch(f"/habits/{h2['id']}/archive/", headers=auth_headers)
+
+        response = client.get("/habits/?filter=all", headers=auth_headers)
+        assert response.json()["total"] == 2
 
 
 class TestMarkDone:
@@ -489,6 +587,23 @@ class TestUndoDone:
         )
 
         assert response.status_code == 404
+
+
+class TestMarkDoneArchivedHabit:
+    def test_mark_done_archived_habit_returns_409(self, client, auth_headers, habit):
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+
+        assert response.status_code == 409
+
+    def test_undo_done_archived_habit_returns_409(self, client, auth_headers, habit):
+        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
+
+        response = client.delete(f"/habits/{habit.id}/done/", headers=auth_headers)
+
+        assert response.status_code == 409
 
 
 class TestHabitStats:

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.db.models import User
 from app.services.habit_service import HabitService
 from app.core.dependencies import get_habit_service, get_current_user
+from app.core.enum import HabitFilter
 from app.api.schemas import (
     HabitCreate,
     HabitResponse,
@@ -51,16 +52,20 @@ def create_habit(
 def get_habits(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    filter: HabitFilter = Query(
+        HabitFilter.ACTIVE, description="Filter habits by archive status"
+    ),
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
     logger.debug(
-        "List habits user_id=%s limit=%s offset=%s",
+        "List habits user_id=%s limit=%s offset=%s filter=%s",
         user.id,
         limit,
         offset,
+        filter,
     )
-    return service.get_habits(user.id, limit, offset)
+    return service.get_habits(user.id, limit, offset, filter)
 
 
 # Get habit
@@ -100,23 +105,47 @@ def update_habit(
     )
 
 
-# Delete
+# Archive
 
 
-@router.delete(
-    "/{habit_id}/", status_code=status.HTTP_204_NO_CONTENT, summary="Delete habit"
+@router.patch(
+    "/{habit_id}/archive/",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Archive habit",
 )
-def delete_habit(
+def archive_habit(
     habit_id: int,
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
     logger.info(
-        "Delete habit user_id=%s habit_id=%s",
+        "Archive habit user_id=%s habit_id=%s",
         user.id,
         habit_id,
     )
-    service.delete_habit(user.id, habit_id)
+    service.archive_habit(user.id, habit_id)
+    return None
+
+
+# Restore
+
+
+@router.patch(
+    "/{habit_id}/restore/",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Restore habit",
+)
+def restore_habit(
+    habit_id: int,
+    user: User = Depends(get_current_user),
+    service: HabitService = Depends(get_habit_service),
+):
+    logger.info(
+        "Restore habit user_id=%s habit_id=%s from archive",
+        user.id,
+        habit_id,
+    )
+    service.restore_habit(user.id, habit_id)
     return None
 
 

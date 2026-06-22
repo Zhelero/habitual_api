@@ -1,6 +1,14 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import String, Date, DateTime, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import (
+    String,
+    Date,
+    DateTime,
+    ForeignKey,
+    UniqueConstraint,
+    Index,
+    Boolean,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -54,6 +62,12 @@ class Habit(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
         nullable=False,
     )
 

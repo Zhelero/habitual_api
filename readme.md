@@ -9,7 +9,7 @@ with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pip
 ![Architecture](https://img.shields.io/badge/architecture-layered-blue)
 ![Auth](https://img.shields.io/badge/auth-JWT%20rotation-green)
 ![Database](https://img.shields.io/badge/db-PostgreSQL-blue)
-![Tests](https://img.shields.io/badge/tests-295%20passed-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-354%20passed-brightgreen?style=flat-square)
 ![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
 
@@ -40,6 +40,7 @@ and requires its own architecture.
 - Request logging middleware
 - Full habit CRUD with user data isolation
 - Mark habits as done / undo
+- Archive / restore habits, with filtering by status
 - Habit statistics (current streak, best streak, completion rate)
 - 30-day heatmap
 - Dashboard with aggregated stats
@@ -97,6 +98,7 @@ app/
 │   └── deps.py       # get_db dependency
 ├── core/
 │   ├── config.py     # settings via pydantic-settings
+│   ├── enums.py       # HabitFilter and other shared enums
 │   ├── security.py   # password hashing
 │   ├── jwt.py        # token creation & validation
 │   ├── middleware.py
@@ -167,11 +169,24 @@ POST /auth/logout
 ### Create habit
 POST /habits
 
+### List habits
+GET /habits?filter=active|archived|all
+
+By default, only active habits are returned. Use the `filter` query parameter to view archived habits or all of them.
+
 ### Mark done
 POST /habits/{id}/done
 
 ### Undo
 DELETE /habits/{id}/done
+
+### Archive
+PATCH /habits/{id}/archive
+
+### Restore
+PATCH /habits/{id}/restore
+
+Archived habits are excluded from the default habit list and dashboard totals, but remain accessible by ID. They cannot be marked done or undone while archived — `mark_done` and `undo_done` return `409` for an archived habit.
 
 ### Heatmap
 GET /habits/{id}/heatmap
@@ -187,6 +202,8 @@ Returns:
   "best_streak": 12
 }
 ```
+
+Archived habits are excluded from `total_habits` and `best_streak`. A habit log created before archiving still counts toward `completed_today` for that day.
 
 ---
 
@@ -320,6 +337,22 @@ curl -X POST http://localhost:8000/habits/ \
 }
 ```
 
+### Archive a habit
+
+```bash
+curl -X PATCH http://localhost:8000/habits/1/archive/ \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Returns `204 No Content`. The habit is excluded from the default list and dashboard totals, but remains accessible by ID.
+
+### List habits including archived
+
+```bash
+curl "http://localhost:8000/habits/?filter=all" \
+  -H "Authorization: Bearer <access_token>"
+```
+
 ### Get habit statistics
 
 ```bash
@@ -385,7 +418,7 @@ pytest
 ```
 
 ```
-295 passed in 91.72s
+354 passed in 97.01s
 ```
 
 ## Test Coverage
@@ -401,6 +434,8 @@ Coverage includes:
 - edge cases and error handling
 - race conditions
 - duplicate actions
+- habit archiving and restoration
+- archive status filtering across repository, service, and API layers
 
 Total coverage: **98%**
 
@@ -410,6 +445,8 @@ The test suite verifies:
 - business rules (duplicate actions, invalid states)
 - user data isolation
 - statistics correctness
+- archived habits are excluded from default lists and dashboard stats, but remain accessible by ID
+- archived habits cannot be marked done or undone
 
 The growing complexity of tests led to recognizing the need
 for test architecture refactoring to support further scaling.
@@ -423,5 +460,7 @@ for test architecture refactoring to support further scaling.
 **Token rotation** — on refresh, the old refresh token is immediately invalidated. Reusing a rotated token returns 401.
 
 **User isolation** — all habit queries are scoped by `user_id`. Accessing another user's habit returns 404 (not 403) to avoid leaking resource existence.
+
+**Habit archiving** — archiving is a soft state change (`is_archived` flag), not a delete. Archived habits keep their full history and remain retrievable by ID, but are excluded from default listings and dashboard aggregates. They cannot be marked done or undone while archived, which keeps the "completed today" count consistent with what the user can still act on.
 
 **SQLAlchemy 2.0** — uses the modern `Mapped` / `mapped_column` syntax throughout.

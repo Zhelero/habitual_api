@@ -6,10 +6,12 @@ from sqlalchemy.exc import IntegrityError
 from app.db.models import Habit, HabitLog
 from app.repositories.habit_repository import HabitRepository
 from app.services.helpers import calculate_best_streak
+from app.core.enum import HabitFilter
 from app.core.exceptions import (
-    HabitAlreadyMarkedError,
     HabitAlreadyExistsError,
+    HabitAlreadyMarkedError,
     HabitNotMarkedError,
+    HabitArchivedError,
     NotFoundError,
     NameCannotBeEmptyError,
     HabitNameTooShortError,
@@ -87,13 +89,22 @@ class HabitService:
         logger.info("Habit updated id=%s user_id=%s", habit_id, user_id)
         return updated
 
-    # Delete habit
+    # Archive habit
 
-    def delete_habit(self, user_id: int, habit_id: int):
-        self._get_habit_or_raise(user_id, habit_id)
-        self.repo.delete_habit(user_id, habit_id)
+    def archive_habit(self, user_id: int, habit_id: int):
+        habit = self._get_habit_or_raise(user_id, habit_id)
+        self.repo.archive_habit(habit)
 
-        logger.info("Habit deleted habit_id=%s user_id=%s", habit_id, user_id)
+        logger.info("Habit archived habit_id=%s user_id=%s", habit_id, user_id)
+        return None
+
+    # Restore habit
+
+    def restore_habit(self, user_id: int, habit_id: int):
+        habit = self._get_habit_or_raise(user_id, habit_id)
+        self.repo.restore_habit(habit)
+
+        logger.info("Habit restored habit_id=%s user_id=%s", habit_id, user_id)
         return None
 
     # Get habit by id
@@ -103,9 +114,15 @@ class HabitService:
 
     # Get all habits
 
-    def get_habits(self, user_id: int, limit: int, offset: int) -> dict[str, Any]:
-        habits = self.repo.get_habits_paginated(user_id, limit, offset)
-        total = self.repo.count_habits(user_id)
+    def get_habits(
+        self,
+        user_id: int,
+        limit: int,
+        offset: int,
+        filter: HabitFilter = HabitFilter.ACTIVE,
+    ) -> dict[str, Any]:
+        habits = self.repo.get_habits_paginated(user_id, limit, offset, filter)
+        total = self.repo.count_habits(user_id, filter)
 
         return {
             "items": habits,
@@ -114,12 +131,19 @@ class HabitService:
             "offset": offset,
         }
 
-        # Mark done
+    # Mark done
 
     def mark_done(self, user_id: int, habit_id: int) -> HabitLog:
         today = datetime.now(timezone.utc).date()
 
-        self._get_habit_or_raise(user_id, habit_id)
+        habit = self._get_habit_or_raise(user_id, habit_id)
+        if habit.is_archived:
+            logger.warning(
+                "Mark done failed: habit archived user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
+            raise HabitArchivedError()
 
         log = self.repo.add_log(user_id, habit_id, today)
         if log is None:
@@ -142,7 +166,14 @@ class HabitService:
     def undo_done(self, user_id: int, habit_id: int) -> bool:
         today = datetime.now(timezone.utc).date()
 
-        self._get_habit_or_raise(user_id, habit_id)
+        habit = self._get_habit_or_raise(user_id, habit_id)
+        if habit.is_archived:
+            logger.warning(
+                "Undo failed: habit archived user_id=%s habit_id=%s",
+                user_id,
+                habit_id,
+            )
+            raise HabitArchivedError()
 
         deleted = self.repo.delete_log(user_id, habit_id, today)
         if not deleted:

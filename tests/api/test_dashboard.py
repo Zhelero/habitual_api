@@ -286,23 +286,76 @@ class TestCompletedToday:
             assert data["best_streak"] == 0
 
 
-class TestTotalHabits:
-    def test_deleted_habit_not_counted(self, client, auth_headers):
-        habits = [create_habit(client, auth_headers) for _ in range(4)]
+class TestArchivedHabits:
+    def test_archived_habit_excluded_from_total(self, client, auth_headers):
+        habits = [create_habit(client, auth_headers) for _ in range(2)]
 
-        response = client.get("/dashboard/", headers=auth_headers)
-        assert response.status_code == 200
-        assert response.json()["total_habits"] == 4
+        client.patch(f"/habits/{habits[0]['id']}/archive/", headers=auth_headers)
 
-        delete_response = client.delete(
-            f"/habits/{habits[0]['id']}/",
-            headers=auth_headers,
-        )
-        assert delete_response.status_code == 204
+        data = client.get("/dashboard/", headers=auth_headers).json()
 
-        response = client.get("/dashboard/", headers=auth_headers)
-        assert response.status_code == 200
-        assert response.json()["total_habits"] == 3
+        assert data["total_habits"] == 1
+
+    def test_archived_habit_excluded_from_best_streak(
+        self, client, freeze_time, base_time
+    ):
+        email = random_email()
+        password = "123456"
+
+        register_user(client, email, password)
+        auth_headers = get_auth_headers(client, email, password)
+        archived_habit = create_habit(client, auth_headers)
+
+        for i in range(4):
+            with freeze_time(base_time - timedelta(days=i)):
+                auth_headers = get_auth_headers(client, email, password)
+                client.post(
+                    f"/habits/{archived_habit['id']}/done/", headers=auth_headers
+                )
+
+        with freeze_time(base_time):
+            auth_headers = get_auth_headers(client, email, password)
+            client.patch(
+                f"/habits/{archived_habit['id']}/archive/", headers=auth_headers
+            )
+
+            active_habit = create_habit(client, auth_headers)
+            client.post(f"/habits/{active_habit['id']}/done/", headers=auth_headers)
+
+            data = client.get("/dashboard/", headers=auth_headers).json()
+
+        # archived habit had a 4-day streak, active only 1 day
+        assert data["best_streak"] == 1
+
+    def test_completed_today_keeps_log_made_before_archiving(
+        self, client, auth_headers
+    ):
+        habit = create_habit(client, auth_headers)
+        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+
+        client.patch(f"/habits/{habit['id']}/archive/", headers=auth_headers)
+
+        data = client.get("/dashboard/", headers=auth_headers).json()
+
+        assert data["completed_today"] == 1
+
+    def test_dashboard_with_only_archived_habits(self, client, auth_headers):
+        habit = create_habit(client, auth_headers)
+        client.patch(f"/habits/{habit['id']}/archive/", headers=auth_headers)
+
+        data = client.get("/dashboard/", headers=auth_headers).json()
+
+        assert data["total_habits"] == 0
+        assert data["best_streak"] == 0
+
+    def test_restored_habit_counted_again(self, client, auth_headers):
+        habit = create_habit(client, auth_headers)
+        client.patch(f"/habits/{habit['id']}/archive/", headers=auth_headers)
+        client.patch(f"/habits/{habit['id']}/restore/", headers=auth_headers)
+
+        data = client.get("/dashboard/", headers=auth_headers).json()
+
+        assert data["total_habits"] == 1
 
 
 # HELPERS
