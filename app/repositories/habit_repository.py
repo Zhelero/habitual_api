@@ -6,7 +6,7 @@ from sqlalchemy.sql import Select
 from sqlalchemy import select, delete, func, update, literal, cast, Date
 
 from app.db.models import Habit, HabitLog
-from app.core.enum import HabitFilter
+from app.core.enums import HabitFilter
 
 logger = logging.getLogger("app.habits.repo")
 
@@ -17,8 +17,10 @@ class HabitRepository:
 
     # Habits
 
-    def create_habit(self, user_id: int, name: str, description: str | None) -> Habit:
-        habit = Habit(user_id=user_id, name=name, description=description)
+    def create_habit(
+        self, user_id: int, name: str, description: str | None, color: str | None = None
+    ) -> Habit:
+        habit = Habit(user_id=user_id, name=name, description=description, color=color)
 
         self.db.add(habit)
         self.db.flush()

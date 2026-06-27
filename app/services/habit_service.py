@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.models import Habit, HabitLog
 from app.repositories.habit_repository import HabitRepository
 from app.services.helpers import calculate_best_streak
-from app.core.enum import HabitFilter
+from app.core.enums import HabitFilter
 from app.core.exceptions import (
     HabitAlreadyExistsError,
     HabitAlreadyMarkedError,
@@ -27,7 +27,9 @@ class HabitService:
 
     # Create habit
 
-    def create_habit(self, user_id: int, name: str, description: str | None) -> Habit:
+    def create_habit(
+        self, user_id: int, name: str, description: str | None, color: str | None = None
+    ) -> Habit:
         name = name.strip()
 
         if not name:
@@ -51,7 +53,7 @@ class HabitService:
             raise HabitNameTooLongError
 
         try:
-            habit = self.repo.create_habit(user_id, name, description)
+            habit = self.repo.create_habit(user_id, name, description, color)
         except IntegrityError:
             logger.warning(
                 "Create habit failed: already exists user_id=%s name=%s",
@@ -70,7 +72,7 @@ class HabitService:
     ) -> Habit | None:
         self._get_habit_or_raise(user_id, habit_id)
 
-        allowed_fields = {"name", "description"}
+        allowed_fields = {"name", "description", "color"}
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
         if not update_data:

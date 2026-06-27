@@ -5,7 +5,7 @@ from app.repositories.habit_repository import HabitRepository
 from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password
 from tests.utils.helpers import random_habit_name, random_email
-from app.core.enum import HabitFilter
+from app.core.enums import HabitFilter
 
 # Fixtures
 
@@ -43,6 +43,16 @@ class TestCreateHabit:
         h = repo.create_habit(user.id, "Habit name", "It's a description")
 
         assert h.description == "It's a description"
+
+    def test_with_color(self, user, repo):
+        h = repo.create_habit(user.id, "Habit name", None, "violet")
+
+        assert h.color == "violet"
+
+    def test_without_color_defaults_to_none(self, user, repo):
+        h = repo.create_habit(user.id, "Habit name", None)
+
+        assert h.color is None
 
     def test_duplicate_habit_name_same_user_raises(self, user, repo):
         from sqlalchemy.exc import IntegrityError
@@ -167,6 +177,11 @@ class TestUpdateHabit:
         )
 
         assert updated.description == "New Description"
+
+    def test_updates_color(self, user, habit, repo):
+        updated = repo.update_habit(user.id, habit.id, {"color": "amber"})
+
+        assert updated.color == "amber"
 
     def test_wrong_user_returns_none(self, other_user, habit, repo):
         result = repo.update_habit(other_user.id, habit.id, {"name": "Hack"})

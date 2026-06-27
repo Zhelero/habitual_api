@@ -13,7 +13,7 @@ from app.core.exceptions import (
 )
 from app.repositories.habit_repository import HabitRepository
 from app.services.habit_service import HabitService
-from app.core.enum import HabitFilter
+from app.core.enums import HabitFilter
 
 from tests.factories.habit_factory import HabitFactory
 from tests.factories.log_factory import HabitLogFactory
@@ -92,6 +92,16 @@ class TestCreateHabit:
         assert habit.user_id == other_user.id
         assert habit.name == name
 
+    def test_create_habit_with_color(self, user, habit_service):
+        habit = habit_service.create_habit(user.id, random_habit_name(), None, "blue")
+
+        assert habit.color == "blue"
+
+    def test_create_habit_without_color_defaults_to_none(self, user, habit_service):
+        habit = habit_service.create_habit(user.id, random_habit_name(), None)
+
+        assert habit.color is None
+
 
 class TestGetHabit:
     def test_returns_habit(self, habit_service, user, habit):
@@ -148,6 +158,11 @@ class TestUpdateHabit:
         )
 
         assert updated.description == "New description"
+
+    def test_updates_color(self, habit_service, user, habit):
+        updated = habit_service.update_habit(user.id, habit.id, {"color": "emerald"})
+
+        assert updated.color == "emerald"
 
     def test_ignores_unknown_fields(self, habit_service, user, habit):
         updated = habit_service.update_habit(

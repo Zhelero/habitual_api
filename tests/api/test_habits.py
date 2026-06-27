@@ -65,6 +65,33 @@ class TestCreateHabit:
 
         assert response.status_code == 409
 
+    def test_create_habit_with_color(self, client, auth_headers):
+        response = client.post(
+            "/habits/",
+            json={"name": random_habit_name(), "color": "blue"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 201
+        assert response.json()["color"] == "blue"
+
+    def test_create_habit_without_color_defaults_to_null(self, client, auth_headers):
+        response = client.post(
+            "/habits/", json={"name": random_habit_name()}, headers=auth_headers
+        )
+
+        assert response.status_code == 201
+        assert response.json()["color"] is None
+
+    def test_create_habit_invalid_color(self, client, auth_headers):
+        response = client.post(
+            "/habits/",
+            json={"name": random_habit_name(), "color": "neon"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+
     def test_create_habit_invalid_token(self, client):
         response = client.post(
             "/habits/",
@@ -207,6 +234,39 @@ class TestUpdateHabit:
         assert response.status_code == 200
         assert data["name"] == habit.name
         assert data["description"] == "updated habit"
+
+    def test_update_habit_color(self, client, auth_headers, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/",
+            json={"color": "emerald"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == habit.name
+        assert data["color"] == "emerald"
+
+    def test_update_habit_invalid_color(self, client, auth_headers, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/",
+            json={"color": "neon"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+
+    def test_clear_habit_color(self, client, auth_headers, habit):
+        client.patch(
+            f"/habits/{habit.id}/", json={"color": "rose"}, headers=auth_headers
+        )
+
+        response = client.patch(
+            f"/habits/{habit.id}/", json={"color": None}, headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        assert response.json()["color"] is None
 
     def test_update_habit_long_name(self, client, auth_headers, habit):
         response = client.patch(

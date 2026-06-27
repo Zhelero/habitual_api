@@ -9,6 +9,7 @@ from pydantic import (
 from datetime import datetime, date
 from typing import Literal
 
+from app.core.enums import HabitColor
 from app.services.helpers import normalize_name, normalize_description
 from app.core.exceptions import AtLeastOneFieldError, NameCannotBeEmptyError
 
@@ -58,6 +59,7 @@ class UserResponse(BaseModel):
 class HabitCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = Field(None, max_length=255)
+    color: HabitColor | None = None
 
     @field_validator("name")
     @classmethod
@@ -79,6 +81,7 @@ class HabitResponse(BaseModel):
     id: int
     name: str
     description: str | None = None
+    color: str | None = None
     created_at: datetime
     updated_at: datetime
     is_archived: bool
@@ -88,10 +91,11 @@ class HabitResponse(BaseModel):
 class HabitUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     description: str | None = Field(None, max_length=255)
+    color: HabitColor | None = None
 
     @model_validator(mode="after")
     def check_at_least_one_field(self):
-        if self.name is None and self.description is None:
+        if not self.model_fields_set:
             raise AtLeastOneFieldError("At least one field is required")
         return self
 

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.db.models import User
 from app.services.habit_service import HabitService
 from app.core.dependencies import get_habit_service, get_current_user
-from app.core.enum import HabitFilter
+from app.core.enums import HabitFilter
 from app.api.schemas import (
     HabitCreate,
     HabitResponse,
@@ -38,7 +38,7 @@ def create_habit(
         user.id,
         habit.name,
     )
-    return service.create_habit(user.id, habit.name, habit.description)
+    return service.create_habit(user.id, habit.name, habit.description, habit.color)
 
 
 # List (pagination)
