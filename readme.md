@@ -48,7 +48,7 @@ and requires its own architecture.
 - Structured error handling
 - Layered architecture (API / Service / Repository)
 - 98% test coverage
-- React UI — [habitual-ui](https://github.com/Zhelero/habitual-ui)
+- React UI — [habitual_ui](https://github.com/Zhelero/habitual_ui)
 
 ---
 
@@ -111,7 +111,7 @@ app/
 
 ## Frontend
 
-A React UI for this API is available at [habitual-ui](https://github.com/Zhelero/habitual-ui).
+A React UI for this API is available at [habitual_ui](https://github.com/Zhelero/habitual_ui).
 
 Built with React + Vite + Tailwind CSS. Features login, registration, habit management, streak tracking and a 30-day heatmap. Connects to this API running on `http://localhost:8000`.
 
@@ -122,7 +122,7 @@ To run the full stack locally, start the API first, then the UI:
 uvicorn app.main:app --reload
 
 # Terminal 2 — UI
-cd habitual-ui
+cd habitual_ui
 npm install
 npm run dev
 ```
