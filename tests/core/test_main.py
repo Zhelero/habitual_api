@@ -1,7 +1,14 @@
-def test_startup_logs(caplog):
-    from app.main import startup
+import logging
 
-    startup()
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+def test_startup_logs(caplog):
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        with TestClient(app):
+            pass
 
     assert "Starting Habitual API" in caplog.text
 

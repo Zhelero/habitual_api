@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,7 +14,16 @@ setup_logging(settings.LOG_LEVEL)
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Habitual API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting Habitual API")
+    logger.info("Log level: %s", settings.LOG_LEVEL)
+    logger.info("Database: %s", settings.DATABASE_URL.split("@")[-1])
+    yield
+
+
+app = FastAPI(title="Habitual API", lifespan=lifespan)
 
 # CORS
 app.add_middleware(
@@ -31,13 +41,6 @@ app.include_router(dashboard.router, tags=["dashboard"])
 app.include_router(auth.router, tags=["auth"])
 
 app.add_exception_handler(AppError, app_error_handler)
-
-
-@app.on_event("startup")
-def startup():
-    logger.info("Starting Habitual API")
-    logger.info("Log level: %s", settings.LOG_LEVEL)
-    logger.info("Database: %s", settings.DATABASE_URL.split("@")[-1])
 
 
 @app.get("/")
