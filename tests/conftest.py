@@ -36,7 +36,16 @@ def db():
     connection = engine.connect()
     transaction = connection.begin()
 
-    session = TestingSessionLocal(bind=connection)
+    # join_transaction_mode="create_savepoint" wraps the session in a SAVEPOINT.
+    # Application code calling db.commit()/db.rollback() (e.g. the `user`/`habit`
+    # fixtures, or TokenBlacklistRepository.add() on IntegrityError) only ends
+    # that SAVEPOINT — SQLAlchemy transparently opens a new one right after —
+    # so the outer `transaction` below still rolls back everything at teardown.
+    # Without this, a commit() inside a test permanently writes to the real DB
+    # and leaks into every test that runs afterwards.
+    session = TestingSessionLocal(
+        bind=connection, join_transaction_mode="create_savepoint"
+    )
 
     try:
         yield session
