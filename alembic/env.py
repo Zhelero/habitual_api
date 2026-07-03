@@ -6,6 +6,13 @@ from alembic import context
 from app.core.config import settings
 from app.db.base import Base
 
+# Models must be imported so they register themselves on Base.metadata.
+# Base itself has no knowledge of them until this import runs — without it,
+# target_metadata below is empty whenever alembic is invoked standalone
+# (e.g. `alembic check` in CI), and Alembic thinks every existing table
+# should be dropped.
+import app.db.models  # noqa: F401
+
 config = context.config
 
 if config.config_file_name is not None:
