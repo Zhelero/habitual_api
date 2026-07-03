@@ -9,7 +9,7 @@ with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pip
 ![Architecture](https://img.shields.io/badge/architecture-layered-blue)
 ![Auth](https://img.shields.io/badge/auth-JWT%20rotation-green)
 ![Database](https://img.shields.io/badge/db-PostgreSQL-blue)
-![Tests](https://img.shields.io/badge/tests-354%20passed-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-366%20passed-brightgreen?style=flat-square)
 ![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
 
@@ -418,7 +418,7 @@ pytest
 ```
 
 ```
-354 passed in 97.01s
+366 passed in 160.01s
 ```
 
 ## Test Coverage
