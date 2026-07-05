@@ -48,6 +48,7 @@ and requires its own architecture.
 - Structured error handling
 - Layered architecture (API / Service / Repository)
 - 98% test coverage
+- Startup/shutdown handled via a `lifespan` context manager (not the deprecated `on_event`)
 - React UI — [habitual_ui](https://github.com/Zhelero/habitual_ui)
 
 ---
@@ -385,7 +386,9 @@ curl -X POST http://localhost:8000/auth/refresh/ \
 
 ### Database
 
-The application uses PostgreSQL in production and SQLite for tests.
+The application uses PostgreSQL for both dev and tests — but as **two separate databases on the same server**: `habitual` for the app, `habitual_test` for the test suite (created automatically via `docker/init-test-db.sql`). This matters because `tests/conftest.py` runs `Base.metadata.drop_all()` at the end of every test session; sharing one database with the dev app used to wipe real data every time the suite ran.
+
+Within a single test, the `db` fixture wraps everything in a SAVEPOINT (`join_transaction_mode="create_savepoint"`), so even a `commit()`/`rollback()` inside application code (e.g. fixtures, or `TokenBlacklistRepository.add()` on a duplicate key) can't leak data into the next test.
 
 Migrations are managed with Alembic:
 
@@ -398,12 +401,13 @@ alembic upgrade head
 
 ## CI
 
-GitHub Actions pipeline:
+GitHub Actions pipeline — three jobs, each gating the next:
 
-- run PostgreSQL service
-- apply Alembic migrations
-- run pytest
-- generate coverage
+1. **lint** — Ruff + Black
+2. **migrations** — validates the Alembic state before running anything else:
+   - fails if there is more than one Alembic head (an unmerged migration branch)
+   - runs `alembic upgrade head` then `alembic check` to confirm the SQLAlchemy models match the latest migration exactly — catches a model change that was never turned into a migration
+3. **test** — runs the full pytest suite with coverage, against the isolated `habitual_test` database
 
 Runs on:
 - push
@@ -418,7 +422,7 @@ pytest
 ```
 
 ```
-366 passed in 160.01s
+366 passed in 97.01s
 ```
 
 ## Test Coverage
@@ -464,3 +468,7 @@ for test architecture refactoring to support further scaling.
 **Habit archiving** — archiving is a soft state change (`is_archived` flag), not a delete. Archived habits keep their full history and remain retrievable by ID, but are excluded from default listings and dashboard aggregates. They cannot be marked done or undone while archived, which keeps the "completed today" count consistent with what the user can still act on.
 
 **SQLAlchemy 2.0** — uses the modern `Mapped` / `mapped_column` syntax throughout.
+
+**Test isolation** — the test suite runs against its own `habitual_test` database and wraps each test in a SAVEPOINT, so `commit()`/`rollback()` calls inside application code can't leak state across tests or into the dev database.
+
+**Timezone-aware timestamps** — all `created_at`/`updated_at`/`expires_at` columns are `TIMESTAMP WITH TIME ZONE`. The application always writes UTC-aware datetimes; storing them without timezone info would silently strip that and invite subtle comparison bugs later.
