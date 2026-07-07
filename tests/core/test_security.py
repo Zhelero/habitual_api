@@ -1,3 +1,6 @@
+import base64
+import json
+
 from jose import jwt
 
 from app.core.config import settings
@@ -7,6 +10,23 @@ from tests.utils.helpers import (
     get_auth_headers,
     create_habit,
 )
+
+
+def _make_unsigned_token(payload: dict) -> str:
+    """Manually builds a raw `alg: none` JWT (header.payload.).
+
+    python-jose's own jwt.encode() refuses to create alg=none tokens at all
+    (JWSError), which is good — but it means we can't use it to test that
+    our *decode* path also rejects one. This bypasses jose entirely and
+    builds the token by hand, the way an attacker actually would.
+    """
+
+    def b64(obj: dict) -> str:
+        raw = json.dumps(obj).encode()
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    header = {"alg": "none", "typ": "JWT"}
+    return f"{b64(header)}.{b64(payload)}."
 
 
 class TestBrokenAccessControl:
@@ -107,8 +127,7 @@ class TestAuthenticationRequired:
         # Flip the last character of the signature — payload looks valid,
         # signature no longer matches.
         tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
-        print("token =", token)
-        print("tampered = ", tampered)
+
         response = client.get(
             "/habits/", headers={"Authorization": f"Bearer {tampered}"}
         )
@@ -189,33 +208,36 @@ class TestInputHandling:
 
 
 class TestRateLimiting:
-    """Brute-force protection on the auth endpoints."""
+    """Confirms brute-force protection exists on the auth endpoints.
 
-    def test_login_is_rate_limited(self, client):
+    Exact boundary behavior (allowed up to N, rejected on N+1) is tested in
+    tests/api/test_auth.py — this just checks that hammering the endpoint
+    eventually gets blocked, without duplicating the precise limits here.
+    """
+
+    def test_repeated_login_attempts_eventually_get_blocked(self, client):
         email = random_email()
         register_user(client, email, "12345678")
 
-        responses = [
+        statuses = [
             client.post(
                 "/auth/login/",
                 json={"email": email, "password": "wrong-password"},
-            )
+            ).status_code
             for _ in range(10)
         ]
 
-        statuses = [r.status_code for r in responses]
         assert 429 in statuses
 
-    def test_register_is_rate_limited(self, client):
-        responses = [
+    def test_repeated_registration_attempts_eventually_get_blocked(self, client):
+        statuses = [
             client.post(
                 "/auth/register/",
                 json={"email": random_email(), "password": "12345678"},
-            )
+            ).status_code
             for _ in range(15)
         ]
 
-        statuses = [r.status_code for r in responses]
         assert 429 in statuses
 
 

@@ -9,6 +9,7 @@ from app.api.schemas import (
     RefreshRequest,
     RegisterRequest,
 )
+from app.core.config import settings
 from app.core.dependencies import get_auth_service, security, get_current_user
 from app.core.rate_limit import limiter
 from app.services.auth_service import AuthService
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=AuthResponse,
     summary="Register a new user",
 )
-@limiter.limit("10/minute")
+@limiter.limit(settings.REGISTER_RATE_LIMIT)
 def register(
     request: Request,
     data: RegisterRequest,
@@ -40,7 +41,7 @@ def register(
 
 
 @router.post("/login/", response_model=AuthResponse, summary="Login user")
-@limiter.limit("5/minute")
+@limiter.limit(settings.LOGIN_RATE_LIMIT)
 def login(
     request: Request,
     data: AuthRequest,

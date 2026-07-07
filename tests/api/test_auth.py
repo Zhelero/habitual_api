@@ -60,9 +60,26 @@ class TestRegister:
 
         assert response.status_code == 422
 
-    def test_many_users(self, client):
+    def test_registration_allows_requests_up_to_limit(self, client):
         for _ in range(10):
             register_user(client, random_email(), DEFAULT_PASSWORD)
+
+    def test_registration_rejects_request_after_limit(self, client):
+        for _ in range(10):
+            register_user(client, random_email(), DEFAULT_PASSWORD)
+
+        response = client.post(
+            "/auth/register/",
+            json={
+                "email": random_email(),
+                "password": DEFAULT_PASSWORD,
+            },
+        )
+
+        assert response.status_code == 429
+        assert response.json() == {
+            "detail": "Too many requests. Please try again later."
+        }
 
 
 class TestLogin:
@@ -114,6 +131,36 @@ class TestLogin:
         with freeze_time(now):
             response = client.get("/auth/me/", headers=auth_headers)
             assert response.status_code == 401
+
+    def test_login_allows_requests_up_to_limit(self, client):
+        email = random_email()
+        register_user(client, email, DEFAULT_PASSWORD)
+
+        for _ in range(5):
+            response = client.post(
+                "/auth/login/", json={"email": email, "password": DEFAULT_PASSWORD}
+            )
+
+            assert response.status_code == 200
+
+    def test_login_rejects_request_after_limit(self, client):
+        email = random_email()
+        register_user(client, email, DEFAULT_PASSWORD)
+
+        for _ in range(5):
+            response = client.post(
+                "/auth/login/", json={"email": email, "password": DEFAULT_PASSWORD}
+            )
+
+            assert response.status_code == 200
+
+        response = client.post(
+            "/auth/login/", json={"email": email, "password": DEFAULT_PASSWORD}
+        )
+        assert response.status_code == 429
+        assert response.json() == {
+            "detail": "Too many requests. Please try again later."
+        }
 
 
 class TestMe:
