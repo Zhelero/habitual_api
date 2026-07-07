@@ -11,10 +11,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    DATABASE_URL: str
+
+    # Configurable so CI/e2e runs (which register/login far more often per
+    # minute than a real user ever would) can relax them without weakening
+    # the production defaults.
     LOGIN_RATE_LIMIT: str = "5/minute"
     REGISTER_RATE_LIMIT: str = "10/minute"
-
-    DATABASE_URL: str
 
     # Comma-separated list, e.g. "http://localhost:5173,https://habitual.app".
     # Add the production frontend domain here once it exists — no code change needed.

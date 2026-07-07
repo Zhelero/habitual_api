@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=AuthResponse,
     summary="Register a new user",
 )
-@limiter.limit(settings.REGISTER_RATE_LIMIT)
+@limiter.limit(lambda: settings.REGISTER_RATE_LIMIT)
 def register(
     request: Request,
     data: RegisterRequest,
@@ -41,7 +41,7 @@ def register(
 
 
 @router.post("/login/", response_model=AuthResponse, summary="Login user")
-@limiter.limit(settings.LOGIN_RATE_LIMIT)
+@limiter.limit(lambda: settings.LOGIN_RATE_LIMIT)
 def login(
     request: Request,
     data: AuthRequest,
