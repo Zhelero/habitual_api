@@ -10,4 +10,4 @@ class UserFactory(BaseFactory):
         model = User
 
     email = factory.Sequence(lambda n: f"user{n}@example.com")
-    password_hash = factory.LazyFunction(lambda: hash_password("123456"))
+    password_hash = factory.LazyFunction(lambda: hash_password("12345678"))
