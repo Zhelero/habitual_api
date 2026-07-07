@@ -36,8 +36,11 @@ class RegisterRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Password cannot be empty")
 
-        if len(v.strip()) < 6:
-            raise ValueError("Password must be at least 6 characters")
+        if len(v.strip()) < 8:
+            raise ValueError("Password must be at least 8 characters")
+
+        if len(v) > 128:
+            raise ValueError("Password must be at most 128 characters")
 
         return v
 

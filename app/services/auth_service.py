@@ -30,7 +30,7 @@ class AuthService:
             logger.warning("Register failed: empty password email=%s", email)
             raise InvalidCredentialsError()
 
-        if len(password.strip()) < 6:
+        if len(password.strip()) < 8:
             logger.warning("Register failed: password too short email=%s", email)
             raise InvalidCredentialsError()
 
