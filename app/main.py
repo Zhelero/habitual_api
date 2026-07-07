@@ -2,12 +2,15 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.rate_limit import limiter
 from app.api.routers import habits, dashboard, auth
 from app.core.exceptions import AppError
-from app.core.handlers import app_error_handler
+from app.core.handlers import app_error_handler, rate_limit_exceeded_handler
 from app.core.middleware import log_requests
 
 setup_logging(settings.LOG_LEVEL)
@@ -25,10 +28,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Habitual API", lifespan=lifespan)
 
-# CORS
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# CORS — explicit allow-list. Configure via the CORS_ORIGINS env var
+# (comma-separated) rather than "*", since credentialed cross-origin
+# requests from an arbitrary site are otherwise possible.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
