@@ -9,8 +9,9 @@ with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pip
 ![Architecture](https://img.shields.io/badge/architecture-layered-blue)
 ![Auth](https://img.shields.io/badge/auth-JWT%20rotation-green)
 ![Database](https://img.shields.io/badge/db-PostgreSQL-blue)
-![Tests](https://img.shields.io/badge/tests-366%20passed-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-386%20passed-brightgreen?style=flat-square)
 ![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
+![Security](https://img.shields.io/badge/security-rate%20limited%20%2B%20audited-blue?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
 
 ---
@@ -49,6 +50,10 @@ and requires its own architecture.
 - Layered architecture (API / Service / Repository)
 - 98% test coverage
 - Startup/shutdown handled via a `lifespan` context manager (not the deprecated `on_event`)
+- Rate limiting on auth endpoints (`slowapi`) — 5/min login, 10/min register, brute-force protection
+- CORS restricted to an explicit allow-list (`CORS_ORIGINS` env var), not `*`
+- Password policy: 8–128 characters, enforced in both the schema and the service layer
+- Dependency vulnerability scanning (`pip-audit`) as a CI gate, alongside GitHub Dependabot
 - React UI — [habitual_ui](https://github.com/Zhelero/habitual_ui)
 
 ---
@@ -63,6 +68,7 @@ and requires its own architecture.
 | Auth       | JWT (python-jose) + token blacklist     |
 | Database   | PostgreSQL                              |
 | Migrations | Alembic                                 |
+| Rate limiting | slowapi                              |
 | CI         | GitHub Actions                          |
 | Testing    | pytest, pytest-mock, TestClient         |
 | Logging    | structured request middleware           |
@@ -102,10 +108,18 @@ app/
 │   ├── enums.py       # HabitFilter and other shared enums
 │   ├── security.py   # password hashing
 │   ├── jwt.py        # token creation & validation
+│   ├── rate_limit.py # shared slowapi Limiter instance
 │   ├── middleware.py
 │   ├── exceptions.py # custom exceptions
 │   └── handlers.py   # exception handlers
 └── main.py
+```
+
+```
+tests/
+├── security/         # IDOR, JWT tampering, injection payloads, rate limits
+├── api/ / services/ / repositories/ / core/
+└── conftest.py       # fixtures, DB isolation, rate-limit reset between tests
 ```
 
 ---
@@ -275,6 +289,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 DATABASE_URL=postgresql://user:password@localhost:5432/habitual
+CORS_ORIGINS=http://localhost:5173
 ```
 
 ### 3. Run migrations
@@ -401,13 +416,14 @@ alembic upgrade head
 
 ## CI
 
-GitHub Actions pipeline — three jobs, each gating the next:
+GitHub Actions pipeline — four jobs:
 
 1. **lint** — Ruff + Black
-2. **migrations** — validates the Alembic state before running anything else:
+2. **dependency-audit** — `pip-audit` against all three requirements files, runs in parallel with lint. Complements GitHub Dependabot (which watches passively and opens update PRs); this gates the PR itself if a known-vulnerable dependency is present.
+3. **migrations** (needs lint + dependency-audit) — validates the Alembic state before running anything else:
    - fails if there is more than one Alembic head (an unmerged migration branch)
    - runs `alembic upgrade head` then `alembic check` to confirm the SQLAlchemy models match the latest migration exactly — catches a model change that was never turned into a migration
-3. **test** — runs the full pytest suite with coverage, against the isolated `habitual_test` database
+4. **test** — runs the full pytest suite with coverage, against the isolated `habitual_test` database
 
 Runs on:
 - push
@@ -422,7 +438,7 @@ pytest
 ```
 
 ```
-366 passed in 97.01s
+386 passed in 117.01s
 ```
 
 ## Test Coverage
@@ -440,6 +456,10 @@ Coverage includes:
 - duplicate actions
 - habit archiving and restoration
 - archive status filtering across repository, service, and API layers
+- broken access control (IDOR) regression tests — a user can never read, update, archive, or complete another user's habit
+- JWT tampering: invalid signature, wrong secret, `alg=none` forgery
+- SQL/script injection payloads in user-controlled fields
+- rate limiting on login/register endpoints
 
 Total coverage: **98%**
 
@@ -472,3 +492,9 @@ for test architecture refactoring to support further scaling.
 **Test isolation** — the test suite runs against its own `habitual_test` database and wraps each test in a SAVEPOINT, so `commit()`/`rollback()` calls inside application code can't leak state across tests or into the dev database.
 
 **Timezone-aware timestamps** — all `created_at`/`updated_at`/`expires_at` columns are `TIMESTAMP WITH TIME ZONE`. The application always writes UTC-aware datetimes; storing them without timezone info would silently strip that and invite subtle comparison bugs later.
+
+**Rate limiting** — `slowapi` limits `/auth/login/` (5/min) and `/auth/register/` (10/min) per IP. The test suite resets the limiter's in-memory storage before every test (`tests/conftest.py`); otherwise counters would accumulate across the whole run the same way the DB used to before it got its own isolated test database.
+
+**CORS as an explicit allow-list** — `allow_origins=["*"]` combined with `allow_credentials=True` lets any site make requests to the API. Origins are now read from `CORS_ORIGINS` (comma-separated env var), defaulting to `http://localhost:5173`.
+
+**Password policy** — 8–128 characters, checked in both the Pydantic schema (`RegisterRequest`) and `AuthService.register()`, so the rule holds even for direct service-layer calls that bypass the API.
