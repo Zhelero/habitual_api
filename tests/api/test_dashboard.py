@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from app.core.jwt import create_access_token
+from tests.factories.user_factory import UserFactory
 from tests.utils.helpers import (
     create_habit,
     register_user,
@@ -194,7 +196,7 @@ class TestCompletedToday:
 
     def test_completed_today_boundary(self, client, freeze_time, base_time):
         email = random_email()
-        password = "123456"
+        password = "12345678"
         midnight = base_time.replace(hour=23, minute=59)
 
         register_user(client, email, password)
@@ -228,7 +230,7 @@ class TestCompletedToday:
     class TestBestStreak:
         def test_best_streak_multi_day(self, client, freeze_time, base_time):
             email = random_email()
-            password = "123456"
+            password = "12345678"
 
             register_user(client, email, password)
             auth_headers = get_auth_headers(client, email, password)
@@ -246,29 +248,48 @@ class TestCompletedToday:
             assert data["best_streak"] == 3
 
         def test_best_streak_not_affected_by_other_users(
-            self, client, auth_headers, freeze_time, base_time
+            self, client, db, freeze_time, base_time
         ):
-            email1 = random_email()
-            email2 = random_email()
-            password = "123456"
+            user1 = UserFactory()
 
-            register_user(client, email1, password)
-            register_user(client, email2, password)
+            auth_headers1 = {
+                "Authorization": f"Bearer {create_access_token({'sub': str(user1.id)})}"
+            }
 
-            auth_headers1 = get_auth_headers(client, email1, password)
             habit1 = create_habit(client, auth_headers1)
             client.post(f"/habits/{habit1['id']}/done/", headers=auth_headers1)
 
-            auth_headers2 = get_auth_headers(client, email2, password)
-            habit2 = create_habit(client, auth_headers2)
+            with freeze_time(base_time - timedelta(4)):
+                user2 = UserFactory()
+                db.commit()
+
+                auth_headers2 = {
+                    "Authorization": f"Bearer {create_access_token({'sub': str(user2.id)})}"
+                }
+
+                habit2 = create_habit(client, auth_headers2)
 
             for i in range(4):
                 with freeze_time(base_time - timedelta(days=i)):
-                    auth_headers = get_auth_headers(client, email2, password)
-                    client.post(f"/habits/{habit2['id']}/done/", headers=auth_headers)
+                    auth_headers2 = {
+                        "Authorization": f"Bearer {create_access_token({'sub': str(user2.id)})}"
+                    }
+                    response = client.post(
+                        f"/habits/{habit2['id']}/done/",
+                        headers=auth_headers2,
+                    )
 
-            auth_headers2 = get_auth_headers(client, email2, password)
-            data = client.get("/dashboard/", headers=auth_headers2).json()
+                    assert response.status_code == 204, response.text
+
+            with freeze_time(base_time):
+                auth_headers2 = {
+                    "Authorization": f"Bearer {create_access_token({'sub': str(user2.id)})}"
+                }
+
+                response = client.get("/dashboard/", headers=auth_headers2)
+            assert response.status_code == 200, response.text
+
+            data = response.json()
 
             assert data["total_habits"] == 1
             assert data["best_streak"] == 4
@@ -300,7 +321,7 @@ class TestArchivedHabits:
         self, client, freeze_time, base_time
     ):
         email = random_email()
-        password = "123456"
+        password = "12345678"
 
         register_user(client, email, password)
         auth_headers = get_auth_headers(client, email, password)
@@ -308,9 +329,9 @@ class TestArchivedHabits:
 
         for i in range(4):
             with freeze_time(base_time - timedelta(days=i)):
-                auth_headers = get_auth_headers(client, email, password)
                 client.post(
-                    f"/habits/{archived_habit['id']}/done/", headers=auth_headers
+                    f"/habits/{archived_habit['id']}/done/",
+                    headers=auth_headers,
                 )
 
         with freeze_time(base_time):

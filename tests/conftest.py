@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.jwt import create_access_token
+from app.core.rate_limit import limiter
 from app.main import app
 from app.db.base import Base
 from app.db.deps import get_db
@@ -29,6 +30,18 @@ def prepare_database():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    # slowapi's counters live in process memory, keyed by client IP + route,
+    # and are NOT reset between tests the way the DB is. Every test that
+    # calls register/login through TestClient shares the same fake client IP
+    # ("testclient"), so without this, rate-limit state would accumulate
+    # across the whole suite — and the two tests that deliberately trip the
+    # limit (TestRateLimiting) would poison every test that runs afterward.
+    limiter.reset()
+    yield
 
 
 @pytest.fixture(scope="function")
@@ -116,7 +129,7 @@ def auth_headers(user):
 
 @pytest.fixture
 def auth_tokens(service, user):
-    return service.login(user.email, "123456")
+    return service.login(user.email, "12345678")
 
 
 @pytest.fixture

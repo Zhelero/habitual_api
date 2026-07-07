@@ -32,7 +32,7 @@ def create_habit(client, headers, name=None):
 
 def register_user(client, email=None, password=None):
     email = email or random_email()
-    password = password or "123456"
+    password = password or "12345678"
 
     response = client.post(
         "/auth/register/",

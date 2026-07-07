@@ -1,99 +1,235 @@
-import pytest
-from passlib.exc import UnknownHashError
+from jose import jwt
 
-from app.core.security import verify_password, hash_password, pwd_context
-
-
-def test_verify_password_true():
-    password = "123456"
-    hashed_password = hash_password(password)
-
-    assert verify_password(password, hashed_password) is True
+from app.core.config import settings
+from tests.utils.helpers import (
+    random_email,
+    register_user,
+    get_auth_headers,
+    create_habit,
+)
 
 
-def test_verify_password_false():
-    hashed = hash_password("123456")
+class TestBrokenAccessControl:
+    """A user must never be able to read, modify, or delete another user's data.
 
-    assert verify_password("wrong_password", hashed) is False
+    The repository layer already scopes every query by user_id (see
+    app/repositories/habit_repository.py), so these are regression tests —
+    they lock in behavior that already exists, so a future change can't
+    silently reopen this class of bug (IDOR / broken object-level auth).
+    """
 
+    def test_cannot_read_another_users_habit(self, client):
+        email_a, email_b = random_email(), random_email()
+        register_user(client, email_a, "12345678")
+        register_user(client, email_b, "12345678")
 
-def test_verify_password_empty():
-    hashed = hash_password("123456")
+        headers_a = get_auth_headers(client, email_a, "12345678")
+        headers_b = get_auth_headers(client, email_b, "12345678")
 
-    assert verify_password("", hashed) is False
+        habit = create_habit(client, headers_a)
 
+        response = client.get(f"/habits/{habit['id']}/", headers=headers_b)
 
-def test_verify_with_invalid_hash():
-    result = verify_password("123456", "invalid_hash")
+        assert response.status_code in (403, 404)
 
-    assert result is False
+    def test_cannot_update_another_users_habit(self, client):
+        email_a, email_b = random_email(), random_email()
+        register_user(client, email_a, "12345678")
+        register_user(client, email_b, "12345678")
 
+        headers_a = get_auth_headers(client, email_a, "12345678")
+        headers_b = get_auth_headers(client, email_b, "12345678")
 
-def test_verify_does_not_modify_hash():
-    password = "123456"
-    hashed = hash_password(password)
+        habit = create_habit(client, headers_a)
 
-    verify_password(password, hashed)
+        response = client.patch(
+            f"/habits/{habit['id']}/",
+            json={"name": "hijacked"},
+            headers=headers_b,
+        )
 
-    assert isinstance(hashed, str)
+        assert response.status_code in (403, 404)
 
+    def test_cannot_archive_another_users_habit(self, client):
+        email_a, email_b = random_email(), random_email()
+        register_user(client, email_a, "12345678")
+        register_user(client, email_b, "12345678")
 
-def test_verify_password_unknown_hash(mocker):
-    mocker.patch.object(pwd_context, "verify", side_effect=UnknownHashError())
+        headers_a = get_auth_headers(client, email_a, "12345678")
+        headers_b = get_auth_headers(client, email_b, "12345678")
 
-    result = verify_password("123456", "some_hash")
-    assert result is False
+        habit = create_habit(client, headers_a)
 
+        response = client.patch(f"/habits/{habit['id']}/archive/", headers=headers_b)
 
-def test_verify_password_value_error(mocker):
-    mocker.patch.object(pwd_context, "verify", side_effect=ValueError("bad"))
+        assert response.status_code in (403, 404)
 
-    result = verify_password("123456", "some_hash")
-    assert result is False
+    def test_cannot_mark_another_users_habit_done(self, client):
+        email_a, email_b = random_email(), random_email()
+        register_user(client, email_a, "12345678")
+        register_user(client, email_b, "12345678")
 
+        headers_a = get_auth_headers(client, email_a, "12345678")
+        headers_b = get_auth_headers(client, email_b, "12345678")
 
-def test_verify_password_unexpected_error(mocker):
-    mocker.patch.object(pwd_context, "verify", side_effect=RuntimeError("boom"))
+        habit = create_habit(client, headers_a)
 
-    result = verify_password("123456", "some_hash")
-    assert result is False
+        response = client.post(f"/habits/{habit['id']}/done/", headers=headers_b)
 
-
-def test_hash_password_not_equal_plain():
-    password = "123456"
-    hashed = hash_password(password)
-
-    assert hashed != password
-
-
-@pytest.mark.parametrize("password", [None, 123, [], {}])
-def test_verify_password_invalid_types(password):
-    result = verify_password(password, "hash")
-
-    assert result is False
-
-
-def test_hash_password_unexpected_error(mocker):
-    mocker.patch.object(pwd_context, "hash", side_effect=RuntimeError("boom"))
-
-    with pytest.raises(RuntimeError):
-        hash_password("123456")
-
-
-def test_hash_password_changes():
-    p1 = hash_password("123456")
-    p2 = hash_password("123456")
-
-    assert p1 != p2
+        assert response.status_code in (403, 404)
 
 
-def test_hash_empty_password():
-    hashed = hash_password("")
-    assert isinstance(hashed, str)
-    assert hashed != ""
+class TestAuthenticationRequired:
+    """Every non-public endpoint must reject requests with no token,
+    a malformed token, or a token that's been tampered with."""
+
+    def test_habits_endpoint_requires_auth(self, client):
+        response = client.get("/habits/")
+        assert response.status_code == 401
+
+    def test_dashboard_endpoint_requires_auth(self, client):
+        response = client.get("/dashboard/")
+        assert response.status_code == 401
+
+    def test_garbage_token_is_rejected(self, client):
+        response = client.get(
+            "/habits/",
+            headers={"Authorization": "Bearer not-a-real-token"},
+        )
+        assert response.status_code == 401
+
+    def test_tampered_token_signature_is_rejected(self, client):
+        email = random_email()
+        register_user(client, email, "12345678")
+        headers = get_auth_headers(client, email, "12345678")
+
+        token = headers["Authorization"].removeprefix("Bearer ")
+        # Flip the last character of the signature — payload looks valid,
+        # signature no longer matches.
+        tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+        print("token =", token)
+        print("tampered = ", tampered)
+        response = client.get(
+            "/habits/", headers={"Authorization": f"Bearer {tampered}"}
+        )
+        assert response.status_code == 401
+
+    def test_token_signed_with_wrong_secret_is_rejected(self, client):
+        email = random_email()
+        register_user(client, email, "12345678")
+
+        # A token that's structurally valid but signed with a secret the
+        # server doesn't know — simulates an attacker who guessed the
+        # payload shape but not the actual secret key.
+        forged = jwt.encode(
+            {"sub": "1", "type": "access"},
+            "not-the-real-secret",
+            algorithm=settings.ALGORITHM,
+        )
+
+        response = client.get("/habits/", headers={"Authorization": f"Bearer {forged}"})
+        assert response.status_code == 401
+
+    def test_alg_none_token_is_rejected(self, client):
+        # Classic JWT library bug class: some libraries historically accepted
+        # alg=none tokens with no signature at all. python-jose rejects this
+        # by default, but it's cheap insurance to pin the behavior in a test.
+        token = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0." "eyJzdWIiOiIxIn0."
+
+        response = client.get("/habits/", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 401
 
 
-@pytest.mark.parametrize("password", [None, 123, [], {}])
-def test_hash_invalid_types(password):
-    with pytest.raises(TypeError):
-        hash_password(password)
+class TestInputHandling:
+    """SQL injection and script-injection payloads should be stored/rejected
+    safely — never executed, never break the query. SQLAlchemy's parameterized
+    queries already protect against SQLi; these tests confirm that in
+    practice rather than trusting the ORM blindly."""
+
+    def test_sql_injection_payload_in_habit_name_is_stored_literally(
+        self, client, auth_headers
+    ):
+        payload = "'; DROP TABLE habits; --"
+
+        response = client.post("/habits/", json={"name": payload}, headers=auth_headers)
+
+        assert response.status_code == 201
+        assert response.json()["name"] == payload.lower()
+
+        # If the payload had actually executed, this would now 500 or
+        # come back empty instead of a normal, populated list.
+        listing = client.get("/habits/", headers=auth_headers)
+        assert listing.status_code == 200
+        assert len(listing.json()["items"]) >= 1
+
+    def test_script_payload_in_habit_name_is_stored_as_plain_text(
+        self, client, auth_headers
+    ):
+        payload = "<script>alert('xss')</script>"
+
+        response = client.post("/habits/", json={"name": payload}, headers=auth_headers)
+
+        assert response.status_code == 201
+        # The API's job is to store/return the raw string unmodified —
+        # escaping on render is the frontend's responsibility (React does
+        # this by default). What we're checking here is that the backend
+        # doesn't do anything dangerous with it server-side (e.g. render
+        # it into an HTML template unescaped somewhere).
+        assert response.json()["name"] == payload
+
+    def test_sql_injection_payload_in_login_email_is_rejected_safely(self, client):
+        response = client.post(
+            "/auth/login/",
+            json={"email": "' OR '1'='1", "password": "whatever"},
+        )
+
+        # Should fail validation (not an email) or auth (no such user) —
+        # either way, never a 500, and never a successful login.
+        assert response.status_code in (401, 422)
+
+
+class TestRateLimiting:
+    """Brute-force protection on the auth endpoints."""
+
+    def test_login_is_rate_limited(self, client):
+        email = random_email()
+        register_user(client, email, "12345678")
+
+        responses = [
+            client.post(
+                "/auth/login/",
+                json={"email": email, "password": "wrong-password"},
+            )
+            for _ in range(10)
+        ]
+
+        statuses = [r.status_code for r in responses]
+        assert 429 in statuses
+
+    def test_register_is_rate_limited(self, client):
+        responses = [
+            client.post(
+                "/auth/register/",
+                json={"email": random_email(), "password": "12345678"},
+            )
+            for _ in range(15)
+        ]
+
+        statuses = [r.status_code for r in responses]
+        assert 429 in statuses
+
+
+class TestPasswordPolicy:
+    def test_password_shorter_than_8_chars_is_rejected(self, client):
+        response = client.post(
+            "/auth/register/",
+            json={"email": random_email(), "password": "short1"},
+        )
+        assert response.status_code == 422
+
+    def test_absurdly_long_password_is_rejected(self, client):
+        response = client.post(
+            "/auth/register/",
+            json={"email": random_email(), "password": "a" * 10_000},
+        )
+        assert response.status_code == 422

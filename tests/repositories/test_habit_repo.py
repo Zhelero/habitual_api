@@ -17,12 +17,12 @@ def repo(db):
 
 @pytest.fixture
 def user(db):
-    return UserRepository(db).create_user(random_email(), hash_password("123456"))
+    return UserRepository(db).create_user(random_email(), hash_password("12345678"))
 
 
 @pytest.fixture
 def other_user(db):
-    return UserRepository(db).create_user(random_email(), hash_password("123456"))
+    return UserRepository(db).create_user(random_email(), hash_password("12345678"))
 
 
 @pytest.fixture

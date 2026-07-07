@@ -5,7 +5,7 @@ import pytest
 from tests.factories.user_factory import UserFactory
 from tests.utils.helpers import random_email, register_user, get_auth_headers
 
-DEFAULT_PASSWORD = "123456"
+DEFAULT_PASSWORD = "12345678"
 
 
 class TestRegister:

@@ -15,7 +15,7 @@ from app.core.exceptions import (
 )
 from tests.utils.helpers import random_email
 
-DEFAULT_PASSWORD = "123456"
+DEFAULT_PASSWORD = "12345678"
 
 
 class TestRegister:
