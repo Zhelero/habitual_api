@@ -1,0 +1,1335 @@
+{
+  "info": {
+    "_postman_id": "b15f46a9-e920-42c6-82f3-c037e5c7c11b",
+    "name": "Habitual",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "8298272"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {\r",
+                  "    pm.response.to.have.status(201);\r",
+                  "});\r",
+                  "\r",
+                  "const json = pm.response.json();\r",
+                  "\r",
+                  "pm.environment.set(\"access_token\", json.access_token);\r",
+                  "pm.environment.set(\"refresh_token\", json.refresh_token);\r",
+                  "pm.environment.set(\"user_id\", json.user_id);\r",
+                  "\r",
+                  "pm.test(\"Token exist\", function() {\r",
+                  "    pm.expect(json.access_token).to.exist;\r",
+                  "    pm.expect(json.refresh_token).to.exist;\r",
+                  "})"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set(\r",
+                  "    \"user_email\",\r",
+                  "    \"test_\" + Date.now() + \"@mail.com\"\r",
+                  ")"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"{{user_email}}\",\r\n    \"password\": \"test_password_123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "description": "## Register\n\nRegisters a new user account and returns authentication tokens along with the user's ID.\n\n---\n\n### Endpoint\n\n`POST {{base_url}}/auth/register/`\n\n---\n\n### Request Body\n\nSent as JSON with the following fields:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `email` | `string` | The email address for the new account. Populated dynamically via the pre-request script. |\n| `password` | `string` | The password for the new account. |\n\n**Example:**\n\n``` json\n{\n  \"email\": \"test_1718000000000@mail.com\",\n  \"password\": \"test_password_123\"\n}\n\n ```\n\n---\n\n### Pre-Request Script\n\nBefore the request is sent, a unique email address is automatically generated using the current timestamp and stored in the environment:\n\n``` js\npm.environment.set(\"user_email\", \"test_\" + Date.now() + \"@mail.com\");\n\n ```\n\nThis ensures each registration attempt uses a fresh, unique email to avoid conflicts.\n\n---\n\n### Success Response\n\n**Status Code:** `201 Created`\n\nThe response body contains the following fields:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `access_token` | `string` | JWT access token for authenticating subsequent requests. |\n| `refresh_token` | `string` | JWT refresh token used to obtain a new access token. |\n| `user_id` | `string` | The unique identifier of the newly registered user. |\n\n**Example:**\n\n``` json\n{\n  \"access_token\": \"<jwt_access_token>\",\n  \"refresh_token\": \"<jwt_refresh_token>\",\n  \"user_id\": \"<user_id>\"\n}\n\n ```\n\n---\n\n### Environment Variables Set\n\nAfter a successful `201` response, the following environment variables are automatically populated for use in subsequent requests:\n\n| Variable | Source |\n| --- | --- |\n| `access_token` | `response.access_token` |\n| `refresh_token` | `response.refresh_token` |\n| `user_id` | `response.user_id` |"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login success\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "const json = pm.response.json();\r",
+                  "\r",
+                  "pm.environment.set(\"access_token\", json.access_token);\r",
+                  "pm.environment.set(\"refresh_token\", json.refresh_token);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "packages": {},
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"{{user_email}}\",\r\n    \"password\": \"test_password_123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "## Login\n\nAuthenticates an existing user with their email and password, returning a pair of JWT tokens for use in subsequent authenticated requests.\n\n---\n\n### Request Body\n\nThe request body must be sent as JSON with the following fields:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `email` | `string` | The registered email address of the user. |\n| `password` | `string` | The user's account password. |\n\n**Example:**\n\n``` json\n{\n  \"email\": \"user@example.com\",\n  \"password\": \"your_password\"\n}\n\n ```\n\n---\n\n### Response\n\nOn success (`200 OK`), the response body contains:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `access_token` | `string` | A short-lived JWT used to authorize API requests. |\n| `refresh_token` | `string` | A longer-lived JWT used to obtain new access tokens. |\n\n**Example:**\n\n``` json\n{\n  \"access_token\": \"eyJ...\",\n  \"refresh_token\": \"eyJ...\"\n}\n\n ```\n\n---\n\n### Side Effects\n\nAfter a successful response, the post-response script automatically stores the returned tokens in the active environment:\n\n- **`access_token`** — set via `pm.environment.set(\"access_token\", ...)`\n    \n- **`refresh_token`** — set via `pm.environment.set(\"refresh_token\", ...)`\n    \n\nThese variables are then available for use in subsequent requests that require authentication."
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Authorized\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "const json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"User has email\", function (){\r",
+                  "    pm.expect(json.email).to.exist;\r",
+                  "})"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                ""
+              ]
+            },
+            "description": "## Get Current User\n\nRetrieves the profile information of the currently authenticated user.\n\n---\n\n### Endpoint\n\n`GET {{base_url}}/auth/me/`\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n---\n\n### Request Body\n\nNone.\n\n---\n\n### Response\n\nOn success (`200 OK`), the response body contains the authenticated user's profile data, including at minimum:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `email` | `string` | The email address of the authenticated user. |\n\n**Example:**\n\n``` json\n{\n  \"email\": \"user@example.com\"\n}\n\n ```\n\n---\n\n### Tests\n\nThe following automated tests run after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Authorized** | Asserts that the response status code is `200 OK`. |\n| **User has email** | Asserts that the `email` field is present in the response body. |\n\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Refresh success\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "const json = pm.response.json();\r",
+                  "\r",
+                  "pm.environment.set(\"access_token\", json.access_token);\r",
+                  "pm.environment.set(\"refresh_token\", json.refresh_token);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"refresh_token\": \"{{refresh_token}}\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh",
+                ""
+              ]
+            },
+            "description": "## Refresh Tokens\n\nRefreshes the authentication tokens by exchanging a valid `refresh_token` for a new token pair.\n\n---\n\n### Request Body\n\nExpects a JSON object with the following field:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `refresh_token` | `string` | The refresh token obtained from a previous login or refresh. Uses the `{{refresh_token}}` environment variable. |\n\n**Example:**\n\n``` json\n{\n  \"refresh_token\": \"{{refresh_token}}\"\n}\n\n ```\n\n---\n\n### Response\n\nOn success (`200 OK`), returns a new token pair:\n\n``` json\n{\n  \"access_token\": \"<new_access_token>\",\n  \"refresh_token\": \"<new_refresh_token>\"\n}\n\n ```\n\n---\n\n### Side Effects\n\nAfter a successful `200` response, the post-response script automatically updates the following environment variables:\n\n- **`access_token`** — set to the new access token from the response\n    \n- **`refresh_token`** — set to the new refresh token from the response\n    \n\nThis ensures subsequent requests in the collection always use up-to-date credentials without any manual intervention."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Logout success\", function () {\r",
+                  "    pm.response.to.have.status(204)\r",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/logout/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout",
+                ""
+              ]
+            },
+            "description": "## Logout\n\nLogs out the currently authenticated user by invalidating their active session/token on the server.\n\n---\n\n### Endpoint\n\n**Method:** `POST`  \n**URL:** `{{base_url}}/auth/logout/`\n\n---\n\n### Authentication\n\nThis request requires a valid Bearer token. The token is read from the `{{access_token}}` environment variable, which must be set (typically populated after a successful **Login** request).\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nNo request body is required for this endpoint.\n\n---\n\n### Expected Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The user was successfully logged out and the token has been invalidated. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or already expired. |\n\nA `204 No Content` response returns no body — this is the expected success state.\n\n---\n\n### Notes\n\n- After a successful logout, the `{{access_token}}` should be considered invalid. Clear or update the variable in your environment if you plan to make further authenticated requests.\n    \n- This endpoint follows standard token invalidation behavior — subsequent requests using the same token will be rejected by the server."
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user (Logged out)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token revoked\", function () {\r",
+                  "    pm.response.to.have.status(401);\r",
+                  "})"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                ""
+              ]
+            },
+            "description": "## Get Current User (Logged Out)\n\nVerifies that the `/auth/me/` endpoint correctly rejects requests when the user is **not authenticated** — i.e., after a logout or when no valid token is present. This request is used to confirm that a previously issued access token has been successfully revoked.\n\n---\n\n### Endpoint\n\n`GET {{base_url}}/auth/me/`\n\n---\n\n### Authentication\n\nThis request intentionally sends **no Authorization header** (or an invalid/expired token). The `{{access_token}}` variable may be unset, cleared, or already invalidated by a prior **Logout** request.\n\n---\n\n### Request Body\n\nNone.\n\n---\n\n### Expected Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `401 Unauthorized` | The token is missing, expired, or has been revoked. This is the expected success condition for this request. |\n\n---\n\n### Tests\n\n| Test | Description |\n| --- | --- |\n| **Token revoked** | Asserts that the response status code is `401 Unauthorized`, confirming the access token is no longer valid. |\n\n---\n\n### Notes\n\n- This request is typically run **after** the **Logout** request to confirm the session has been fully terminated.\n    \n- A `401` response here is the **desired outcome** — it proves the token invalidation worked correctly."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Habits",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login success\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "const json = pm.response.json();\r",
+                  "\r",
+                  "pm.environment.set(\"access_token\", json.access_token);\r",
+                  "pm.environment.set(\"refresh_token\", json.refresh_token);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"{{user_email}}\",\r\n    \"password\": \"test_password_123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login/?",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "",
+                  "value": null,
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "## Login\n\nAuthenticates a user and returns access and refresh tokens.\n\n### Request Body\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `email` | string | The user's email address. Uses the `{{user_email}}` environment variable. |\n| `password` | string | The user's password. |\n\n### Variables Used\n\n- `{{base_url}}` — The base URL of the API server.\n    \n- `{{user_email}}` — The email address of the user to authenticate.\n    \n\n### Response\n\nOn success, returns HTTP `200 OK` with a JSON body containing:\n\n| Field | Description |\n| --- | --- |\n| `access_token` | Short-lived JWT used to authenticate subsequent requests. Saved to the `access_token` environment variable. |\n| `refresh_token` | Long-lived token used to obtain new access tokens. Saved to the `refresh_token` environment variable. |\n\n### Post-Response Behavior\n\nAfter a successful response, the following environment variables are automatically set:\n\n- `access_token`\n    \n- `refresh_token`"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Habit",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set(\r",
+                  "    \"habit_name\", \"work hard\"\r",
+                  ")"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit created\", function () {\r",
+                  "    pm.response.to.have.status(201);\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.environment.set(\"habit_id\", json.id);\r",
+                  "\r",
+                  "pm.test(\"Habit has name\", function () {\r",
+                  "    pm.expect(json.name).to.be.eql(pm.environment.get(\"habit_name\"))\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Habit has id\", function () {\r",
+                  "    pm.expect(json.id).to.be.a(\"number\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Habit has created_at\", function() {\r",
+                  "    pm.expect(json.created_at).to.exist;\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Habit has updated_at\", function() {\r",
+                  "    pm.expect(json.updated_at).to.exist;\r",
+                  "});",
+                  "",
+                  "pm.test(\"Habit has color\", function () {",
+                  "    pm.expect(json.color).to.eql(\"emerald\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\": \"{{habit_name}}\",\r\n    \"description\": \"Go to gym\",\r\n    \"color\": \"emerald\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/habits/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                ""
+              ]
+            },
+            "description": "## Create Habit\n\nCreates a new habit for the currently authenticated user.\n\n---\n\n### Endpoint\n\n`POST {{base_url}}/habits/`\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n---\n\n### Pre-Request Script\n\nBefore the request is sent, the `habit_name` environment variable is automatically set:\n\n``` js\npm.environment.set(\"habit_name\", \"work hard\");\n\n ```\n\n---\n\n### Request Body\n\nSent as JSON with the following fields:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `name` | `string` | The name of the habit. Populated from the `{{habit_name}}` environment variable. |\n| `description` | `string` | A short description of the habit. |\n| `color` | `string` | A color label for the habit (e.g. `\"emerald\"`). |\n\n**Example:**\n\n``` json\n{\n  \"name\": \"work hard\",\n  \"description\": \"Go to gym\",\n  \"color\": \"emerald\"\n}\n\n ```\n\n---\n\n### Response\n\nOn success (`201 Created`), the response body contains the newly created habit object, including at minimum:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `id` | `number` | The unique identifier of the created habit. |\n| `name` | `string` | The name of the habit, matching the value sent in the request. |\n| `color` | `string` | The color label assigned to the habit. |\n| `created_at` | `string` | ISO 8601 timestamp of when the habit was created. |\n| `updated_at` | `string` | ISO 8601 timestamp of when the habit was last updated. |\n\n---\n\n### Side Effects\n\nAfter a successful response, the post-response script automatically stores the new habit's ID in the environment:\n\n- **`habit_id`** — set to `json.id` from the response body\n    \n\n---\n\n### Tests\n\nThe following automated tests run after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Habit created** | Asserts that the response status code is `201 Created`. |\n| **Habit has name** | Asserts that `name` in the response matches the `{{habit_name}}` environment variable. |\n| **Habit has id** | Asserts that `id` is present and is a number. |\n| **Habit has created_at** | Asserts that the `created_at` field exists in the response. |\n| **Habit has updated_at** | Asserts that the `updated_at` field exists in the response. |\n| **Habit has color** | Asserts that `color` equals `\"emerald\"`. |"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habits",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Get habits OK\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Has items array\", function () {\r",
+                  "    pm.expect(json.items).to.be.an(\"array\")\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Items not empty\", function () {\r",
+                  "    pm.expect(json.items.length).to.be.greaterThan(0);\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Item has required fields\", function () {\r",
+                  "    if (json.items.length > 0) {\r",
+                  "        let item = json.items[0];\r",
+                  "\r",
+                  "        pm.expect(item).to.have.property(\"id\");\r",
+                  "        pm.expect(item).to.have.property(\"name\");\r",
+                  "        pm.expect(item).to.have.property(\"created_at\");\r",
+                  "    }\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Item fields have correct types\", function () {\r",
+                  "    if (json.items.lenght > 0) {\r",
+                  "        let item = json.items[0];\r",
+                  "\r",
+                  "        pm.expect(item.id).to.be.a(\"number\");\r",
+                  "        pm.expect(item.name).to.be.a(\"string\");\r",
+                  "        pm.expect(item.created_at).to.be.a(\"string\");\r",
+                  "    }\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Created habit exists in list\", function () {\r",
+                  "    const habitId = Number(pm.environment.get(\"habit_id\"));\r",
+                  "\r",
+                  "    const habit = json.items.find(item => item.id === habitId);\r",
+                  "\r",
+                  "    pm.expect(habit).to.exist;\r",
+                  "});\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                ""
+              ]
+            },
+            "description": "## Get Habits\n\nRetrieves a paginated list of all habits belonging to the currently authenticated user.\n\n---\n\n### Endpoint\n\n`GET {{base_url}}/habits/`\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n---\n\n### Request Body\n\nNone.\n\n---\n\n### Response\n\nOn success (`200 OK`), returns a JSON object with an `items` array containing the user's habits.\n\n**Example:**\n\n``` json\n{\n  \"items\": [\n    {\n      \"id\": 1,\n      \"name\": \"Morning Run\",\n      \"created_at\": \"2024-01-01T08:00:00Z\"\n    }\n  ]\n}\n\n ```\n\nEach item in the `items` array contains at minimum:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `id` | `number` | Unique identifier of the habit. |\n| `name` | `string` | The name of the habit. |\n| `created_at` | `string` | ISO 8601 timestamp of when the habit was created. |\n\n---\n\n### Tests\n\nThe following automated tests run after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Get habits OK** | Asserts that the response status code is `200 OK`. |\n| **Has items array** | Asserts that the response body contains an `items` property that is an array. |\n| **Items not empty** | Asserts that the `items` array contains at least one element. |\n| **Item has required fields** | Asserts that the first item in the array has `id`, `name`, and `created_at` fields. |\n| **Item fields have correct types** | Asserts that `id` is a number, `name` is a string, and `created_at` is a string. |\n| **Created habit exists in list** | Asserts that the habit stored in the `{{habit_id}}` environment variable is present in the returned list. |"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habit by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Get Habit by ID ok\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Correct habit returned\", function () {\r",
+                  "    pm.expect(json.id).to.eql(Number(pm.environment.get(\"habit_id\")))\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"habit_name exists in env\", function (){\r",
+                  "    pm.expect(pm.environment.get(\"habit_name\")).to.exist;\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Habit has required fields\", function () {\r",
+                  "\r",
+                  "        pm.expect(json).to.have.property(\"id\");\r",
+                  "        pm.expect(json).to.have.property(\"name\");\r",
+                  "        pm.expect(json).to.have.property(\"created_at\");\r",
+                  "        pm.expect(json).to.have.property(\"updated_at\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Habit fields have correct types\", function () {\r",
+                  "\r",
+                  "        pm.expect(json.id).to.be.a(\"number\");\r",
+                  "        pm.expect(json.name).to.be.a(\"string\");\r",
+                  "        pm.expect(json.created_at).to.be.a(\"string\");\r",
+                  "        pm.expect(json.updated_at).to.be.a(\"string\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Name is not empty\", function () {\r",
+                  "    pm.expect(json.name).to.be.a(\"string\").and.not.empty;\r",
+                  "})\r",
+                  "\r",
+                  "pm.test(\"Correct name\", function () {\r",
+                  "    pm.expect(json.name).to.eql(pm.environment.get(\"habit_name\"));\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"created_at is valid date\", function () {\r",
+                  "    pm.expect(isNaN(Date.parse(json.created_at))).to.be.false;\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"updated_at is valid date\", function () {\r",
+                  "    pm.expect(isNaN(Date.parse(json.updated_at))).to.be.false;\r",
+                  "});\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                ""
+              ]
+            },
+            "description": "## Get Habit by ID\n\nRetrieves the details of a specific habit by its unique identifier.\n\n---\n\n### Endpoint\n\n**Method:** `GET`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/`\n\n---\n\n### URL Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API (e.g., `https://api.example.com`). Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to retrieve. Set in the active environment. |\n\n---\n\n### Authentication\n\nThis request requires a valid Bearer token. The `access_token` environment variable is used for authentication and must be set before sending the request.\n\n**Type:** Bearer Token  \n**Token:** `{{access_token}}`\n\n---\n\n### Request Body\n\nNone — this is a `GET` request and does not require a request body.\n\n---\n\n### Response\n\nOn success, the endpoint returns a `200 OK` status with a JSON object representing the habit:\n\n``` json\n{\n  \"id\": \"string\",\n  \"name\": \"string\",\n  \"created_at\": \"string (ISO 8601 datetime)\",\n  \"updated_at\": \"string (ISO 8601 datetime)\"\n}\n\n ```\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `id` | string | The unique identifier of the habit. |\n| `name` | string | The name/title of the habit. |\n| `created_at` | string | Timestamp of when the habit was created. |\n| `updated_at` | string | Timestamp of when the habit was last updated. |\n\n---\n\n### Tests & Validations\n\nThe following validations are automatically run after the response is received:\n\n- **Status code** is `200 OK`.\n    \n- **Response body** is a valid JSON object.\n    \n- Response contains the expected fields: `id`, `name`, `created_at`, and `updated_at`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Habit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit updated\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Habit name updated\", function () {\r",
+                  "    pm.expect(json.name).to.eql(pm.environment.get(\"updated_habit_name\"));\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Description updated\", function () {\r",
+                  "    pm.expect(json.description).to.eql(\"Updated description for the habit\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Fields exist\", function () {\r",
+                  "    pm.expect(json).to.have.property(\"id\");\r",
+                  "    pm.expect(json).to.have.property(\"updated_at\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"habit_id unchanged\", function () {\r",
+                  "    pm.expect(json.id).to.eql(Number(pm.environment.get(\"habit_id\")));\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"updated_at exists and valid\", function () {\r",
+                  "    pm.expect(json.updated_at).to.exist;\r",
+                  "    pm.expect(isNaN(Date.parse(json.updated_at))).to.be.false;\r",
+                  "});",
+                  "",
+                  "pm.test(\"Habit color updated\", function () {",
+                  "    pm.expect(json.color).to.eql(\"violet\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "let newName = pm.environment.get(\"habit_name\") + \" Updated\";\r",
+                  "pm.environment.set(\"updated_habit_name\", newName.toLowerCase())"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\": \"{{updated_habit_name}}\",\r\n    \"description\": \"Updated description for the habit\",\r\n    \"color\": \"violet\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                ""
+              ]
+            },
+            "description": "# Update Habit\n\nUpdates one or more fields of an existing habit identified by its ID.\n\n## Method & URL\n\n```\nPATCH {{base_url}}/habits/{{habit_id}}/\n\n ```\n\n## Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the API (e.g., `https://api.example.com`) |\n| `habit_id` | The ID of the habit to update, stored in the active environment |\n| `updated_habit_name` | The new name for the habit, generated by the pre-request script and stored in the environment |\n| `access_token` | Bearer token used for authentication |\n\n## Request Body\n\nSent as raw JSON:\n\n``` json\n{\n  \"name\": \"{{updated_habit_name}}\",\n  \"description\": \"Updated description for the habit\",\n  \"color\": \"violet\"\n}\n\n ```\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `name` | `string` | The new name for the habit (sourced from the `updated_habit_name` environment variable) |\n| `description` | `string` | A new description for the habit |\n| `color` | `string` | The updated color label for the habit (e.g., `\"violet\"`) |\n\n## Pre-Request Script\n\nBefore the request is sent, the script reads the current `habit_name` from the environment, appends `\" Updated\"` to it, converts the result to lowercase, and stores it as `updated_habit_name` in the environment. This ensures the request body always carries a predictable, traceable name.\n\n``` js\nlet newName = pm.environment.get(\"habit_name\") + \" Updated\";\npm.environment.set(\"updated_habit_name\", newName.toLowerCase());\n\n ```\n\n## Post-Response Tests\n\nAfter the response is received, the following assertions are validated:\n\n| Test | What it checks |\n| --- | --- |\n| **Habit updated** | Response status code is `200 OK` |\n| **Habit name updated** | `json.name` matches the `updated_habit_name` environment variable |\n| **Description updated** | `json.description` equals `\"Updated description for the habit\"` |\n| **Fields exist** | Response body contains both `id` and `updated_at` properties |\n| **habit_id unchanged** | `json.id` matches the `habit_id` environment variable (cast to a number) |\n| **updated_at exists and valid** | `json.updated_at` is present and parses as a valid date |\n| **Habit color updated** | `json.color` equals `\"violet\"` |"
+          },
+          "response": []
+        },
+        {
+          "name": "Archive Habit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit archived\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/archive/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "archive",
+                ""
+              ]
+            },
+            "description": "## Archive Habit\n\nArchives an existing habit, removing it from the active habits list without permanently deleting it. The habit can be restored later.\n\n---\n\n### Endpoint\n\n**Method:** `PATCH`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/archive/`\n\n---\n\n### URL Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to archive. Set in the active environment. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n---\n\n### Request Body\n\nNone — this endpoint does not require a request body.\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully archived. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n| `404 Not Found` | No habit with the given `{{habit_id}}` was found for the authenticated user. |\n\n---\n\n### Tests\n\n| Test | Description |\n| --- | --- |\n| **Habit archived** | Asserts that the response status code is `204 No Content`. |\n\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habit by ID (Archived)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Still fetchable by id\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let json = pm.response.json();",
+                  "",
+                  "pm.test(\"is_archived is true\", function () {",
+                  "    pm.expect(json.is_archived).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                ""
+              ]
+            },
+            "description": "## Get Habit by ID (Archived)\n\nRetrieves a specific habit by its unique ID. This request is used in the context of **archived habits** to verify that a habit remains accessible via its ID even after it has been archived.\n\n---\n\n### Endpoint\n\n`GET {{base_url}}/habits/{{habit_id}}/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `{{base_url}}` | The base URL of the Habitual API (e.g., `https://api.example.com`). |\n| `{{habit_id}}` | The unique identifier of the habit to retrieve. |\n| `{{access_token}}` | The bearer token used to authenticate the request. |\n\n---\n\n### Expected Response\n\n**Status:** `200 OK`\n\nThe response body is a JSON object representing the habit. When used in the archived context, the response will include:\n\n``` json\n{\n  \"is_archived\": true,\n  ...\n}\n\n ```\n\n---\n\n### Tests\n\nThe following post-response tests are run automatically:\n\n1. **Still fetchable by ID** — Asserts that the response status is `200`, confirming the habit can still be retrieved after archiving.\n    \n2. **is_archived is true** — Asserts that the `is_archived` field in the response body is `true`, confirming the habit's archived state.\n    \n\n---\n\n### Notes\n\n- Archived habits are **not deleted** — they remain accessible via this endpoint using their ID.\n    \n- This request is typically run after an archive operation to validate that the habit's `is_archived` flag has been correctly set."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habits (filter=active, excludes archived)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let json = pm.response.json();",
+                  "const habitId = Number(pm.environment.get(\"habit_id\"));",
+                  "",
+                  "pm.test(\"Archived habit is excluded from active filter\", function () {",
+                  "    const found = json.items.find(item => item.id === habitId);",
+                  "    pm.expect(found).to.not.exist;",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/?filter=active",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "active"
+                }
+              ]
+            },
+            "description": "Retrieves a paginated list of the authenticated user's **active** habits. Archived habits are explicitly excluded from the results.\n\n## Endpoint\n\n`GET {{base_url}}/habits/?filter=active`\n\n## Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n## Query Parameters\n\n| Parameter | Value | Required | Description |\n| --- | --- | --- | --- |\n| `filter` | `active` | Yes | Filters the habit list to return only active habits. Archived habits are excluded from the response. |\n\n## Response\n\nReturns a JSON object with an `items` array containing the active habits for the current user.\n\n**Success —** **`200 OK`**\n\n``` json\n{\n  \"items\": [\n    {\n      \"id\": 1,\n      \"name\": \"Morning Run\",\n      ...\n    }\n  ]\n}\n\n ```\n\n## Notes\n\n- Archived habits (identified by `habit_id` in the environment) will **not** appear in the response when this filter is applied.\n    \n- The response is validated by automated tests that confirm a `200 OK` status and that the archived habit is absent from the `items` array."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habits (filter=archived, includes archived)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let json = pm.response.json();",
+                  "const habitId = Number(pm.environment.get(\"habit_id\"));",
+                  "",
+                  "pm.test(\"Archived habit shows up in archived filter\", function () {",
+                  "    const found = json.items.find(item => item.id === habitId);",
+                  "    pm.expect(found).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/?filter=archived",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "archived"
+                }
+              ]
+            },
+            "description": "Retrieves a paginated list of the authenticated user's **archived** habits. Active habits are not excluded, but the archived habit identified by `{{habit_id}}` is confirmed to appear in the results.\n\n## Endpoint\n\n`GET {{base_url}}/habits/?filter=archived`\n\n## Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n## Query Parameters\n\n| Parameter | Value | Required | Description |\n| --- | --- | --- | --- |\n| `filter` | `archived` | Yes | Filters the habit list to return only archived habits. |\n\n## Response\n\nReturns a JSON object with an `items` array containing the archived habits for the current user.\n\n**Success —** **`200 OK`**\n\n``` json\n{\n  \"items\": [\n    {\n      \"id\": 1,\n      \"name\": \"Morning Run\",\n      \"is_archived\": true,\n      ...\n    }\n  ]\n}\n\n ```\n\n## Tests\n\nThe following automated tests run after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Status OK** | Asserts that the response status code is `200 OK`. |\n| **Archived habit shows up in archived filter** | Asserts that the habit identified by the `habit_id` environment variable is present in the `items` array of the response, confirming it appears when the `archived` filter is applied. |"
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Habit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit restored\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/restore/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "restore",
+                ""
+              ]
+            },
+            "description": "## Restore Habit\n\nRestores a previously archived habit, making it active again. This is the counterpart to the **Archive Habit** endpoint.\n\n---\n\n### Endpoint\n\n**Method:** `PATCH`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/restore/`\n\n---\n\n### URL Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to restore. Set in the active environment. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nNone — this endpoint does not require a request body.\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully restored. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\n| Test | Description |\n| --- | --- |\n| **Habit restored** | Asserts that the response status code is `204 No Content`, confirming the habit has been successfully restored. |"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Habits (filter=active, habit is back)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let json = pm.response.json();",
+                  "const habitId = Number(pm.environment.get(\"habit_id\"));",
+                  "",
+                  "pm.test(\"Restored habit is back in the active list\", function () {",
+                  "    const found = json.items.find(item => item.id === habitId);",
+                  "    pm.expect(found).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/?filter=active",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "active"
+                }
+              ]
+            },
+            "description": "Retrieves a paginated list of the authenticated user's **active** habits. This request is used in the context of **habit restoration** to verify that a previously archived habit has been successfully restored and is visible again in the active habits list.\n\n## Endpoint\n\n`GET {{base_url}}/habits/?filter=active`\n\n## Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n## Query Parameters\n\n| Parameter | Value | Required | Description |\n| --- | --- | --- | --- |\n| `filter` | `active` | Yes | Filters the habit list to return only active (non-archived) habits. |\n\n## Response\n\nReturns a JSON object with an `items` array containing the active habits for the current user.\n\n**Success —** **`200 OK`**\n\n``` json\n{\n  \"items\": [\n    {\n      \"id\": 1,\n      \"name\": \"Morning Run\",\n      ...\n    }\n  ]\n}\n\n ```\n\n## Tests\n\nThe following automated tests run after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Status OK** | Asserts that the response status code is `200 OK`. |\n| **Restored habit is back in the active list** | Asserts that the habit identified by `{{habit_id}}` is present in the `items` array, confirming it was successfully restored from the archived state. |\n\n## Notes\n\n- This request is typically run after a **Restore Habit** request to confirm the habit is no longer archived.\n    \n- The `{{habit_id}}` environment variable must be set to the ID of the habit being verified."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark done",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit marked as done\", function () {\r",
+                  "    pm.response.to.have.status(204);\r",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/done/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "done",
+                ""
+              ]
+            },
+            "description": "## Mark Done\n\nRecords a completion entry for the specified habit, marking it as done for the current period.\n\n---\n\n### Endpoint\n\n**Method:** `POST`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/done/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to mark as done. Set in the active environment. |\n| `access_token` | Bearer token used to authenticate the request. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nNone — this endpoint does not require a request body.\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully marked as done. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\nThe following automated test runs after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Habit marked as done** | Asserts that the response status code is `204 No Content`. |\n\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "Habit stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status OK\", function () {\r",
+                  "    pm.response.to.have.status(200);\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Stats fields exist\", function () {\r",
+                  "    pm.expect(json).to.have.property(\"current_streak\");\r",
+                  "    pm.expect(json).to.have.property(\"best_streak\");\r",
+                  "    pm.expect(json).to.have.property(\"completion_last_7_days\");\r",
+                  "    pm.expect(json).to.have.property(\"completion_last_30_days\");\r",
+                  "    pm.expect(json).to.have.property(\"last_7_days\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Stats types correct\", function () {\r",
+                  "    pm.expect(json.current_streak).to.be.a(\"number\");\r",
+                  "    pm.expect(json.best_streak).to.be.a(\"number\");\r",
+                  "    pm.expect(json.completion_last_7_days).to.be.a(\"number\");\r",
+                  "    pm.expect(json.completion_last_30_days).to.be.a(\"number\");\r",
+                  "    pm.expect(json.last_7_days).to.be.an(\"array\");\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"After mark_done streak >= 1\", function () {\r",
+                  "    pm.expect(json.current_streak).to.be.at.least(1);\r",
+                  "});\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/stats/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "stats",
+                ""
+              ]
+            },
+            "description": "## Habit Stats\n\nRetrieves statistical data for a specific habit, including streak information and completion rates over recent time periods.\n\n---\n\n### Method & URL\n\n```\nGET {{base_url}}/habits/{{habit_id}}/stats/\n\n ```\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the API (e.g., `http://localhost:8000`) |\n| `habit_id` | The unique identifier of the habit to retrieve stats for |\n| `access_token` | Bearer token used for authentication — passed in the `Authorization` header |\n\n---\n\n### Response\n\nA successful request returns a `200 OK` response with a JSON object containing the following fields:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `current_streak` | `number` | The number of consecutive days the habit has been completed up to today |\n| `best_streak` | `number` | The longest consecutive streak ever recorded for this habit |\n| `completion_last_7_days` | `number` | The number of times the habit was completed in the last 7 days |\n| `completion_last_30_days` | `number` | The number of times the habit was completed in the last 30 days |\n| `last_7_days` | `array` | An array of daily completion records for the past 7 days |\n\n---\n\n### Tests\n\nThe following automated tests are run against the response:\n\n- **Status OK (200)** — Verifies the response status code is `200`.\n    \n- **Stats fields exist** — Checks that `current_streak`, `best_streak`, `completion_last_7_days`, `completion_last_30_days`, and `last_7_days` are all present in the response body.\n    \n- **Stats types correct** — Validates that streak and completion fields are numbers and that `last_7_days` is an array.\n    \n- **Streak ≥ 1 after mark_done** — Asserts that `current_streak` is at least `1` after a habit has been marked as done."
+          },
+          "response": []
+        },
+        {
+          "name": "Habit heatmap",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Heatmap OK\", function () {\r",
+                  "\r",
+                  "});\r",
+                  "\r",
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Heatmap is array\", function () {\r",
+                  "    pm.expect(json).to.be.an('array'); \r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Heatmap not empty\", function () {\r",
+                  "    pm.expect(json.length).to.be.greaterThan(0); \r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Heatmap items valid\", function () {\r",
+                  "    if (json.length > 0) {\r",
+                  "        let item = json[0];\r",
+                  "\r",
+                  "        pm.expect(item).to.have.property(\"date\");\r",
+                  "        pm.expect(item).to.have.property(\"done\");\r",
+                  "\r",
+                  "        pm.expect(item.date).to.be.a(\"string\");\r",
+                  "        pm.expect(item.done).to.be.a(\"boolean\");\r",
+                  "    }\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"At least one day is marked done\", function () {\r",
+                  "    const hasDone = json.some(item => item.done === true);\r",
+                  "    pm.expect(hasDone).to.be.true;\r",
+                  "});\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/heatmap/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "heatmap",
+                ""
+              ]
+            },
+            "description": "## Habit Heatmap\n\nRetrieves a heatmap of habit completion data for a specific habit. The response provides a day-by-day breakdown of whether the habit was completed, making it useful for visualizing consistency and streaks over time.\n\n---\n\n### Method & URL\n\n```\nGET {{base_url}}/habits/{{habit_id}}/heatmap/\n\n ```\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the API (e.g., `https://api.example.com`) |\n| `habit_id` | The unique identifier of the habit to retrieve heatmap data for |\n| `access_token` | Bearer token used for authentication — included in the `Authorization` header |\n\n---\n\n### Response\n\nReturns a **JSON array** of objects, each representing a single day's completion status for the habit.\n\n**Example response:**\n\n``` json\n[\n  { \"date\": \"2024-01-01\", \"done\": true },\n  { \"date\": \"2024-01-02\", \"done\": false },\n  { \"date\": \"2024-01-03\", \"done\": true }\n]\n\n ```\n\n**Response object fields:**\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `date` | `string` | The date of the entry (ISO 8601 format, e.g., `\"2024-01-01\"`) |\n| `done` | `boolean` | Whether the habit was completed on that date |\n\n---\n\n### Expected Behaviour\n\n- The response array is expected to be **non-empty**.\n    \n- At least **one item** in the array should have `done: true`, indicating the habit has been completed at least once."
+          },
+          "response": []
+        },
+        {
+          "name": "Undo mark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit unmarked\", function () {\r",
+                  "    pm.response.to.have.status(204);\r",
+                  "});\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/done/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "done",
+                ""
+              ]
+            },
+            "description": "## Undo Mark\n\nRemoves the completion entry for the specified habit, marking it as **not done** for the current period. This is the counterpart to the **Mark Done** endpoint.\n\n---\n\n### Endpoint\n\n**Method:** `DELETE`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/done/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to unmark. Set in the active environment. |\n| `access_token` | Bearer token used to authenticate the request. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nNone — this endpoint does not require a request body.\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit completion entry was successfully removed. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\n| Test | Description |\n| --- | --- |\n| **Habit unmarked** | Asserts that the response status code is `204 No Content`, confirming the completion entry was successfully deleted. |\n\n---"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
