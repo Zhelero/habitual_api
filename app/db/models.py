@@ -90,12 +90,14 @@ class HabitLog(Base):
     habit_id: Mapped[int] = mapped_column(
         ForeignKey("habits.id", ondelete="CASCADE"), nullable=False
     )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    date: Mapped[date] = mapped_column(Date, nullable=False)
 
     habit: Mapped["Habit"] = relationship(back_populates="logs")
 

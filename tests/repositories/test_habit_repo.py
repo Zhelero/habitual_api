@@ -332,12 +332,42 @@ class TestAddLog:
         assert log is not None
         assert log.habit_id == habit.id
         assert log.date == today
+        assert log.note is None
+
+    def test_add_log_with_note(self, user, habit, repo):
+        today = date.today()
+        note = "New note"
+        log = repo.add_log(user.id, habit.id, today, note)
+
+        assert log is not None
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note == note
+
+    def test_add_log_strips_whitespace_only_note(self, user, habit, repo):
+        today = date.today()
+        note = "   "
+        log = repo.add_log(user.id, habit.id, today, note)
+
+        assert log is not None
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note is None
 
     def test_duplicate_date_returns_none(self, user, habit, repo):
         today = date.today()
         repo.add_log(user.id, habit.id, today)
 
         result = repo.add_log(user.id, habit.id, today)
+
+        assert result is None
+
+    def test_duplicate_date_with_note_returns_none(self, user, habit, repo):
+        today = date.today()
+        note = "New note"
+        repo.add_log(user.id, habit.id, today, note)
+
+        result = repo.add_log(user.id, habit.id, today, note)
 
         assert result is None
 
@@ -358,9 +388,10 @@ class TestAddLog:
 
 
 class TestDeleteLog:
-    def test_deletes_and_returns_true(self, user, habit, repo):
+    def test_deletes_logs_with_note(self, user, habit, repo):
         today = date.today()
-        repo.add_log(user.id, habit.id, today)
+        note = "Good day"
+        repo.add_log(user.id, habit.id, today, note)
 
         result = repo.delete_log(user.id, habit.id, today)
 

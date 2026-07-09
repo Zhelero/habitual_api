@@ -107,7 +107,13 @@ class HabitRepository:
 
     # LOGS
 
-    def add_log(self, user_id: int, habit_id: int, log_date: date) -> HabitLog | None:
+    def add_log(
+        self,
+        user_id: int,
+        habit_id: int,
+        log_date: date,
+        note: str | None = None,
+    ) -> HabitLog | None:
         stmt = select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
         habit = self.db.execute(stmt).scalar_one_or_none()
 
@@ -133,7 +139,8 @@ class HabitRepository:
             )
             return None
 
-        log = HabitLog(habit_id=habit_id, date=log_date)
+        note = note.strip() or None if note else None
+        log = HabitLog(habit_id=habit_id, date=log_date, note=note)
         self.db.add(log)
         self.db.flush()
 
