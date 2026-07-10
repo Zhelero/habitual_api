@@ -295,6 +295,13 @@ class TestMarkDone:
         assert log is not None
         assert log.date == date.today()
 
+    def test_marks_done_creates_log_with_note(self, habit_service, habit):
+        note = "New note"
+        log = habit_service.mark_done(habit.user_id, habit.id, note)
+
+        assert log is not None
+        assert log.note == note
+
     def test_mark_done_twice_raises(self, habit_service, habit):
         habit_service.mark_done(habit.user_id, habit.id)
 
@@ -308,6 +315,16 @@ class TestMarkDone:
     def test_mark_done_missing_habit_raises(self, habit_service, user):
         with pytest.raises(NotFoundError):
             habit_service.mark_done(user.id, 123)
+
+    def test_mark_done_blank_note_becomes_none(self, habit_service, habit):
+        today = date.today()
+        note = "   "
+        log = habit_service.mark_done(habit.user_id, habit.id, note)
+
+        assert log is not None
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note is None
 
 
 class TestUndoDone:

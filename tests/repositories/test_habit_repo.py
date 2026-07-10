@@ -344,16 +344,6 @@ class TestAddLog:
         assert log.date == today
         assert log.note == note
 
-    def test_add_log_strips_whitespace_only_note(self, user, habit, repo):
-        today = date.today()
-        note = "   "
-        log = repo.add_log(user.id, habit.id, today, note)
-
-        assert log is not None
-        assert log.habit_id == habit.id
-        assert log.date == today
-        assert log.note is None
-
     def test_duplicate_date_returns_none(self, user, habit, repo):
         today = date.today()
         repo.add_log(user.id, habit.id, today)

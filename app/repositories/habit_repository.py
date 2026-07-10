@@ -139,7 +139,6 @@ class HabitRepository:
             )
             return None
 
-        note = note.strip() or None if note else None
         log = HabitLog(habit_id=habit_id, date=log_date, note=note)
         self.db.add(log)
         self.db.flush()

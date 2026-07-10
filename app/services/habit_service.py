@@ -135,7 +135,9 @@ class HabitService:
 
     # Mark done
 
-    def mark_done(self, user_id: int, habit_id: int) -> HabitLog:
+    def mark_done(
+        self, user_id: int, habit_id: int, note: str | None = None
+    ) -> HabitLog:
         today = datetime.now(timezone.utc).date()
 
         habit = self._get_habit_or_raise(user_id, habit_id)
@@ -147,7 +149,10 @@ class HabitService:
             )
             raise HabitArchivedError()
 
-        log = self.repo.add_log(user_id, habit_id, today)
+        if note is not None:
+            note = note.strip() or None
+
+        log = self.repo.add_log(user_id, habit_id, today, note)
         if log is None:
             logger.warning(
                 "Mark done failed: already marked user_id=%s habit_id=%s",
