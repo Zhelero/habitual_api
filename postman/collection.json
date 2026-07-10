@@ -1119,7 +1119,12 @@
               ]
             },
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/habits/{{habit_id}}/done/",
               "host": [
@@ -1132,7 +1137,16 @@
                 ""
               ]
             },
-            "description": "## Mark Done\n\nRecords a completion entry for the specified habit, marking it as done for the current period.\n\n---\n\n### Endpoint\n\n**Method:** `POST`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/done/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to mark as done. Set in the active environment. |\n| `access_token` | Bearer token used to authenticate the request. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nNone — this endpoint does not require a request body.\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully marked as done. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\nThe following automated test runs after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Habit marked as done** | Asserts that the response status code is `204 No Content`. |\n\n---"
+            "description": "## Mark Done\n\nRecords a completion entry for the specified habit, marking it as done for the current period.\n\n---\n\n### Endpoint\n\n**Method:** `POST`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/done/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to mark as done. Set in the active environment. |\n| `access_token` | Bearer token used to authenticate the request. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nRequired (JSON object). The body itself must be present; `note` is optional.\n\n```json\n{\n    \"note\": \"Completed today\"\n}\n```\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully marked as done. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\nThe following automated test runs after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Habit marked as done** | Asserts that the response status code is `204 No Content`. |\n\n---",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"note\": \"Completed today\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         },
