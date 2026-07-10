@@ -568,7 +568,7 @@ class TestMarkDone:
         response = client.post("/habits/999999/done/", headers=auth_headers, json={})
         assert response.status_code == 404
 
-    def test_mark_done_without_note(self, client, habit, auth_headers):
+    def test_mark_done_requires_body(self, client, habit, auth_headers):
         response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
 
         assert response.status_code == 422
