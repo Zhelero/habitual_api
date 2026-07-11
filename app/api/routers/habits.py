@@ -12,6 +12,7 @@ from app.api.schemas import (
     HabitHeatmap,
     HabitUpdate,
     PaginatedHabits,
+    HabitDoneRequest,
 )
 
 logger = logging.getLogger("app.habits")
@@ -159,6 +160,7 @@ def restore_habit(
 )
 def mark_done(
     habit_id: int,
+    request: HabitDoneRequest,
     user: User = Depends(get_current_user),
     service: HabitService = Depends(get_habit_service),
 ):
@@ -167,7 +169,10 @@ def mark_done(
         user.id,
         habit_id,
     )
-    service.mark_done(user.id, habit_id)
+
+    note = request.note if request.note else None
+    service.mark_done(user.id, habit_id, note)
+
     return None
 
 

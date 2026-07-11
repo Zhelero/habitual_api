@@ -1,6 +1,7 @@
 import pytest
 
 from app.core.jwt import create_access_token
+from app.db.models import HabitLog
 from tests.factories.habit_factory import HabitFactory
 from tests.factories.user_factory import UserFactory
 from tests.services.test_auth_service import DEFAULT_PASSWORD
@@ -11,7 +12,7 @@ from tests.utils.helpers import (
     get_auth_headers,
     random_email,
 )
-from datetime import timedelta, date
+from datetime import timedelta
 
 
 class TestCreateHabit:
@@ -493,7 +494,9 @@ class TestListHabitsArchiveFilter:
 
 class TestMarkDone:
     def test_mark_done(self, client, auth_headers, habit):
-        response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        response = client.post(
+            f"/habits/{habit.id}/done/", headers=auth_headers, json={}
+        )
         assert response.status_code == 204
 
         data = client.get(f"/habits/{habit.id}/stats/", headers=auth_headers).json()
@@ -504,9 +507,42 @@ class TestMarkDone:
         assert len(data["last_7_days"]) == 7
         assert any(day["done"] for day in data["last_7_days"])
 
+    def test_mark_done_with_note(self, client, auth_headers, habit, db):
+        response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Morning run  "},
+        )
+
+        assert response.status_code == 204
+
+        log = db.query(HabitLog).filter(HabitLog.habit_id == habit.id).one()
+
+        assert log.note == "Morning run"
+
+    def test_mark_done_blank_note_becomes_none(self, client, auth_headers, habit, db):
+        response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "  "},
+        )
+
+        assert response.status_code == 204
+
+        log = db.query(HabitLog).filter(HabitLog.habit_id == habit.id).one()
+
+        assert log.note is None
+
     def test_mark_done_twice(self, client, auth_headers, habit):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
-        response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        response = client.post(
+            f"/habits/{habit.id}/done/", headers=auth_headers, json={}
+        )
+
+        assert response.status_code == 204
+
+        response = client.post(
+            f"/habits/{habit.id}/done/", headers=auth_headers, json={}
+        )
 
         assert response.status_code == 409
 
@@ -523,29 +559,41 @@ class TestMarkDone:
         response = client.post(
             f"/habits/{habit['id']}/done/",
             headers=auth(user2["access_token"]),
+            json={},
         )
 
         assert response.status_code == 404
 
     def test_mark_done_wrong_id(self, client, auth_headers):
-        response = client.post("/habits/999999/done/", headers=auth_headers)
+        response = client.post("/habits/999999/done/", headers=auth_headers, json={})
         assert response.status_code == 404
+
+    def test_mark_done_requires_body(self, client, habit, auth_headers):
+        response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+
+        assert response.status_code == 422
 
     def test_mark_done_wrong_token(self, client, habit):
         response = client.post(
-            f"/habits/{habit.id}/done/", headers={"Authorization": "Bearer wrong_token"}
+            f"/habits/{habit.id}/done/",
+            headers={"Authorization": "Bearer wrong_token"},
+            json={},
         )
         assert response.status_code == 401
 
     def test_mark_done_no_token(self, client, habit):
-        response = client.post(f"/habits/{habit.id}/done/")
+        response = client.post(f"/habits/{habit.id}/done/", json={})
 
         assert response.status_code == 401
 
 
 class TestUndoDone:
     def test_undo_done(self, client, auth_headers, habit):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Did something"},
+        )
 
         response = client.delete(f"/habits/{habit.id}/done/", headers=auth_headers)
         assert response.status_code == 204
@@ -559,7 +607,7 @@ class TestUndoDone:
         assert all(not day["done"] for day in data["last_7_days"])
 
     def test_undo_recalculates_stats(self, client, auth_headers, habit):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit.id}/done/", headers=auth_headers, json={})
 
         stats1 = client.get(f"/habits/{habit.id}/stats/", headers=auth_headers).json()
         assert stats1["completion_last_7_days"] == pytest.approx(1 / 7 * 100)
@@ -573,7 +621,7 @@ class TestUndoDone:
         assert stats2["completion_last_30_days"] == pytest.approx(0.0)
 
     def test_double_undo(self, client, auth_headers, habit):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit.id}/done/", headers=auth_headers, json={})
         client.delete(f"/habits/{habit.id}/done/", headers=auth_headers)
 
         response = client.delete(f"/habits/{habit.id}/done/", headers=auth_headers)
@@ -603,11 +651,11 @@ class TestUndoDone:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
             response = client.get(f"/habits/{habit_id}/stats/", headers=auth_headers)
 
         assert response.status_code == 200
@@ -653,7 +701,9 @@ class TestMarkDoneArchivedHabit:
     def test_mark_done_archived_habit_returns_409(self, client, auth_headers, habit):
         client.patch(f"/habits/{habit.id}/archive/", headers=auth_headers)
 
-        response = client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        response = client.post(
+            f"/habits/{habit.id}/done/", headers=auth_headers, json={}
+        )
 
         assert response.status_code == 409
 
@@ -668,7 +718,7 @@ class TestMarkDoneArchivedHabit:
 
 class TestHabitStats:
     def test_habit_stats(self, client, auth_headers, habit):
-        client.post(f"/habits/{habit.id}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit.id}/done/", headers=auth_headers, json={})
 
         response = client.get(f"/habits/{habit.id}/stats/", headers=auth_headers)
 
@@ -693,11 +743,11 @@ class TestHabitStats:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
             stats = client.get(
                 f"/habits/{habit_id}/stats/", headers=auth_headers
             ).json()
@@ -716,7 +766,9 @@ class TestHabitStats:
         habit = create_response.json()
 
         done_response = client.post(
-            f"/habits/{habit['id']}/done/", headers=auth_headers
+            f"/habits/{habit['id']}/done/",
+            headers=auth_headers,
+            json={},
         )
         assert done_response.status_code == 204
 
@@ -755,7 +807,7 @@ class TestHabitStats:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
             stats = client.get(
                 f"/habits/{habit_id}/stats/", headers=auth_headers
             ).json()
@@ -769,11 +821,11 @@ class TestHabitStats:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
             stats = client.get(
                 f"/habits/{habit_id}/stats/", headers=auth_headers
             ).json()
@@ -790,15 +842,15 @@ class TestHabitStats:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time - timedelta(days=6)):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
             stats = client.get(
                 f"/habits/{habit_id}/stats/", headers=auth_headers
             ).json()
@@ -815,11 +867,11 @@ class TestHabitStats:
             register_user(client, email, DEFAULT_PASSWORD)
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
             habit_id = get_habit_id(client, auth_headers)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time - timedelta(days=29)):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
-            client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         with freeze_time(base_time):
             auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
@@ -856,22 +908,29 @@ class TestHabitHeatmap:
         assert isinstance(item["date"], str)
         assert isinstance(item["done"], bool)
 
-    def test_heatmap_reflects_done(self, client, auth_headers, habit):
-        client.post(
-            f"/habits/{habit.id}/done/",
-            headers=auth_headers,
-        )
+    def test_heatmap_reflects_done(self, client, auth_headers, freeze_time, base_time):
+        email = random_email()
+        with freeze_time(base_time):
+            register_user(client, email, DEFAULT_PASSWORD)
+            auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
+            habit_id = get_habit_id(client, auth_headers)
+            response = client.post(
+                f"/habits/{habit_id}/done/",
+                headers=auth_headers,
+                json={},
+            )
+            assert response.status_code == 204
 
-        data = client.get(
-            f"/habits/{habit.id}/heatmap/",
-            headers=auth_headers,
-        ).json()
+            data = client.get(
+                f"/habits/{habit_id}/heatmap/",
+                headers=auth_headers,
+            ).json()
 
-        today = date.today().isoformat()
+            today = base_time.date().isoformat()
 
-        today_entry = next(day for day in data if day["date"] == today)
+            today_entry = next(day for day in data if day["date"] == today)
 
-        assert today_entry["done"] is True
+            assert today_entry["done"] is True
 
 
 # Helper

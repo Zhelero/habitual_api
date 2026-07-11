@@ -28,7 +28,7 @@ class TestDashboard:
 
         habit_id = habits[0]["id"]
 
-        client.post(f"/habits/{habit_id}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit_id}/done/", headers=auth_headers, json={})
 
         response = client.get("/dashboard/", headers=auth_headers)
         assert response.status_code == 200
@@ -62,8 +62,7 @@ class TestDashboard:
         create_habit(client, auth(user2["access_token"]))
 
         client.post(
-            f"/habits/{h1['id']}/done/",
-            headers=auth(user1["access_token"]),
+            f"/habits/{h1['id']}/done/", headers=auth(user1["access_token"]), json={}
         )
 
         response = client.get(
@@ -139,7 +138,7 @@ class TestIsolation:
         h2 = {"Authorization": f"Bearer {user2['access_token']}"}
 
         habit = create_habit(client, h1)
-        client.post(f"/habits/{habit['id']}/done/", headers=h1)
+        client.post(f"/habits/{habit['id']}/done/", headers=h1, json={})
 
         data1 = client.get("/dashboard/", headers=h1).json()
         data2 = client.get("/dashboard/", headers=h2).json()
@@ -162,6 +161,7 @@ class TestIsolation:
         response = client.post(
             f"/habits/{habit['id']}/done/",
             headers=h2,
+            json={},
         )
 
         assert response.status_code == 404
@@ -170,7 +170,7 @@ class TestIsolation:
 class TestCompletedToday:
     def test_undo_decrements_completed_today(self, client, auth_headers):
         habit = create_habit(client, auth_headers)
-        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers, json={})
 
         data_before = client.get("/dashboard/", headers=auth_headers).json()
         assert data_before["total_habits"] == 1
@@ -186,7 +186,7 @@ class TestCompletedToday:
         habits = [create_habit(client, auth_headers) for _ in range(4)]
 
         for h in habits[:3]:
-            client.post(f"/habits/{h['id']}/done/", headers=auth_headers)
+            client.post(f"/habits/{h['id']}/done/", headers=auth_headers, json={})
 
         data = client.get("/dashboard/", headers=auth_headers).json()
 
@@ -205,7 +205,7 @@ class TestCompletedToday:
 
         with freeze_time(midnight):
             headers = get_auth_headers(client, email, password)
-            client.post(f"/habits/{habit['id']}/done/", headers=headers)
+            client.post(f"/habits/{habit['id']}/done/", headers=headers, json={})
 
         with freeze_time(midnight + timedelta(minutes=3)):
             data = client.get("/dashboard/", headers=headers).json()
@@ -217,9 +217,9 @@ class TestCompletedToday:
     def test_dashboard_after_duplicate_mark(self, client, auth_headers):
         habit = create_habit(client, auth_headers)
 
-        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers, json={})
 
-        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers, json={})
 
         data = client.get("/dashboard/", headers=auth_headers).json()
 
@@ -239,7 +239,9 @@ class TestCompletedToday:
             for i in range(3):
                 with freeze_time(base_time - timedelta(days=i)):
                     auth_headers = get_auth_headers(client, email, password)
-                    client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+                    client.post(
+                        f"/habits/{habit['id']}/done/", headers=auth_headers, json={}
+                    )
 
             auth_headers = get_auth_headers(client, email, password)
             data = client.get("/dashboard/", headers=auth_headers).json()
@@ -257,7 +259,7 @@ class TestCompletedToday:
             }
 
             habit1 = create_habit(client, auth_headers1)
-            client.post(f"/habits/{habit1['id']}/done/", headers=auth_headers1)
+            client.post(f"/habits/{habit1['id']}/done/", headers=auth_headers1, json={})
 
             with freeze_time(base_time - timedelta(4)):
                 user2 = UserFactory()
@@ -277,6 +279,7 @@ class TestCompletedToday:
                     response = client.post(
                         f"/habits/{habit2['id']}/done/",
                         headers=auth_headers2,
+                        json={},
                     )
 
                     assert response.status_code == 204, response.text
@@ -296,7 +299,7 @@ class TestCompletedToday:
 
         def test_undo_resets_best_streak(self, client, auth_headers):
             habit = create_habit(client, auth_headers)
-            client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+            client.post(f"/habits/{habit['id']}/done/", headers=auth_headers, json={})
 
             client.delete(f"/habits/{habit['id']}/done/", headers=auth_headers)
 
@@ -332,6 +335,7 @@ class TestArchivedHabits:
                 client.post(
                     f"/habits/{archived_habit['id']}/done/",
                     headers=auth_headers,
+                    json={},
                 )
 
         with freeze_time(base_time):
@@ -341,7 +345,9 @@ class TestArchivedHabits:
             )
 
             active_habit = create_habit(client, auth_headers)
-            client.post(f"/habits/{active_habit['id']}/done/", headers=auth_headers)
+            client.post(
+                f"/habits/{active_habit['id']}/done/", headers=auth_headers, json={}
+            )
 
             data = client.get("/dashboard/", headers=auth_headers).json()
 
@@ -352,7 +358,7 @@ class TestArchivedHabits:
         self, client, auth_headers
     ):
         habit = create_habit(client, auth_headers)
-        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers)
+        client.post(f"/habits/{habit['id']}/done/", headers=auth_headers, json={})
 
         client.patch(f"/habits/{habit['id']}/archive/", headers=auth_headers)
 

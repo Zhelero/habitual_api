@@ -94,7 +94,9 @@ class TestBrokenAccessControl:
 
         habit = create_habit(client, headers_a)
 
-        response = client.post(f"/habits/{habit['id']}/done/", headers=headers_b)
+        response = client.post(
+            f"/habits/{habit['id']}/done/", headers=headers_b, json={}
+        )
 
         assert response.status_code in (403, 404)
 

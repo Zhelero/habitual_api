@@ -118,6 +118,10 @@ class HabitUpdate(BaseModel):
         return normalize_description(value)
 
 
+class HabitDoneRequest(BaseModel):
+    note: str | None = Field(None, max_length=500)
+
+
 class HabitHeatmap(BaseModel):
     date: date
     done: bool
