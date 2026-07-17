@@ -480,7 +480,21 @@ class TestGetHeatmap:
 
         assert len(result) == 30
 
-    def test_logged_day_is_done(self, habit_service, habit):
+    def test_logged_day_returns_done_status_and_note(self, habit_service, habit):
+        today = date.today()
+        note = "Some action"
+        HabitLogFactory(habit=habit, date=today, note=note)
+
+        result = habit_service.get_heatmap(habit.user_id, habit.id)
+
+        today_entry = next(r for r in result if r["date"] == today.isoformat())
+
+        assert today_entry["done"] is True
+        assert today_entry["note"] == note
+
+    def test_logged_day_without_note_returns_done_and_no_note(
+        self, habit_service, habit
+    ):
         today = date.today()
         HabitLogFactory(habit=habit, date=today)
 
@@ -489,11 +503,13 @@ class TestGetHeatmap:
         today_entry = next(r for r in result if r["date"] == today.isoformat())
 
         assert today_entry["done"] is True
+        assert today_entry["note"] is None
 
-    def test_empty_days_are_not_done(self, habit_service, habit):
+    def test_empty_day_returns_no_done_status_and_no_note(self, habit_service, habit):
         result = habit_service.get_heatmap(habit.user_id, habit.id)
 
         assert all(not r["done"] for r in result)
+        assert all(r["note"] is None for r in result)
 
     def test_wrong_user_raises(self, habit_service, other_user, habit):
         with pytest.raises(NotFoundError):
