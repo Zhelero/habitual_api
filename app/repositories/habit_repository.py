@@ -228,7 +228,11 @@ class HabitRepository:
         )
 
         stmt = (
-            select(dates.c.date, (HabitLog.id.is_not(None)).label("done"))
+            select(
+                dates.c.date,
+                (HabitLog.id.is_not(None)).label("done"),
+                HabitLog.note,
+            )
             .select_from(dates)
             .outerjoin(
                 HabitLog,
@@ -243,6 +247,7 @@ class HabitRepository:
             {
                 "date": str(row.date),
                 "done": bool(row.done),
+                "note": row.note,
             }
             for row in result
         ]
