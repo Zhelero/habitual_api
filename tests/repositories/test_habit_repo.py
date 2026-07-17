@@ -510,7 +510,18 @@ class TestGetHeatmap:
         assert "date" in result[0]
         assert "done" in result[0]
 
-    def test_done_true_for_logged_day(self, user, habit, repo):
+    def test_logged_day_returns_done_status_and_note(self, user, habit, repo):
+        today = date.today()
+        note = "It's done"
+        repo.add_log(user.id, habit.id, today, note)
+
+        result = repo.get_heatmap(user.id, habit.id)
+        today_entry = next(r for r in result if r["date"] == str(today))
+
+        assert today_entry["done"] is True
+        assert today_entry["note"] == note
+
+    def test_logged_day_without_note_returns_done_and_no_note(self, user, habit, repo):
         today = date.today()
         repo.add_log(user.id, habit.id, today)
 
@@ -518,11 +529,13 @@ class TestGetHeatmap:
         today_entry = next(r for r in result if r["date"] == str(today))
 
         assert today_entry["done"] is True
+        assert today_entry["note"] is None
 
-    def test_done_false_for_empty_day(self, user, habit, repo):
+    def test_empty_day_returns_no_done_status_and_no_note(self, user, habit, repo):
         result = repo.get_heatmap(user.id, habit.id)
 
         assert all(r["done"] is False for r in result)
+        assert all(r["note"] is None for r in result)
 
     def test_ordered_ascending(self, user, habit, repo):
         today = date.today()
