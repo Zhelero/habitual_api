@@ -13,3 +13,5 @@ class HabitLogFactory(BaseFactory):
     date = factory.Sequence(lambda n: date.today() - timedelta(days=n))
 
     habit = factory.SubFactory(HabitFactory)
+
+    note = None
