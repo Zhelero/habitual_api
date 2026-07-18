@@ -125,6 +125,7 @@ class HabitDoneRequest(BaseModel):
 class HabitHeatmap(BaseModel):
     date: date
     done: bool
+    note: str | None = None
 
 
 class HabitStats(BaseModel):
