@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "b15f46a9-e920-42c6-82f3-c037e5c7c11b",
+    "_postman_id": "61237a42-8fff-4f32-9ffc-a4311c8d193f",
     "name": "Habitual",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "8298272"
@@ -1125,6 +1125,15 @@
                 "value": "application/json"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"note\": \"Completed today\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
               "raw": "{{base_url}}/habits/{{habit_id}}/done/",
               "host": [
@@ -1137,16 +1146,7 @@
                 ""
               ]
             },
-            "description": "## Mark Done\n\nRecords a completion entry for the specified habit, marking it as done for the current period.\n\n---\n\n### Endpoint\n\n**Method:** `POST`  \n**URL:** `{{base_url}}/habits/{{habit_id}}/done/`\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the Habitual API. Set in the active environment. |\n| `habit_id` | The unique identifier of the habit to mark as done. Set in the active environment. |\n| `access_token` | Bearer token used to authenticate the request. |\n\n---\n\n### Authentication\n\nRequires a valid Bearer token passed via the `Authorization` header. The token is sourced from the `{{access_token}}` environment variable.\n\n| Type | Value |\n| --- | --- |\n| Bearer Token | `{{access_token}}` |\n\n> ⚠️ **Note:** If `{{access_token}}` is missing or expired, the request will fail with a `401 Unauthorized` response. \n  \n\n---\n\n### Request Body\n\nRequired (JSON object). The body itself must be present; `note` is optional.\n\n```json\n{\n    \"note\": \"Completed today\"\n}\n```\n\n---\n\n### Response\n\n| Status Code | Meaning |\n| --- | --- |\n| `204 No Content` | The habit was successfully marked as done. No response body is returned. |\n| `401 Unauthorized` | The `{{access_token}}` is missing, invalid, or expired. |\n\n---\n\n### Tests\n\nThe following automated test runs after the response is received:\n\n| Test | Description |\n| --- | --- |\n| **Habit marked as done** | Asserts that the response status code is `204 No Content`. |\n\n---",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"note\": \"Completed today\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "description": "Marks a specific habit as completed for the current day.\n\n## Endpoint\n\n`POST {{base_url}}/habits/{{habit_id}}/done/`\n\n## Authentication\n\nRequires a valid `access_token` in the active environment. Make sure the `Authorization` header or token is configured at the collection or environment level.\n\n## Path Variables\n\n| Variable | Description |\n| --- | --- |\n| `habit_id` | The unique identifier of the habit to mark as done. |\n\n## Request Headers\n\n| Header | Value |\n| --- | --- |\n| `Content-Type` | `application/json` |\n\n## Request Body\n\n``` json\n{\n    \"note\": \"Completed today\"\n}\n\n ```\n\n| Field | Type | Required | Description |\n| --- | --- | --- | --- |\n| `note` | string | No | An optional note to attach to the completion entry. |\n\n## Response\n\nReturns `204 No Content` on success. No response body is returned.\n\n## Test\n\nThe request includes an automated test that asserts the response status is `204`."
           },
           "response": []
         },
@@ -1226,35 +1226,35 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Heatmap OK\", function () {\r",
-                  "\r",
-                  "});\r",
-                  "\r",
                   "let json = pm.response.json();\r",
                   "\r",
                   "pm.test(\"Heatmap is array\", function () {\r",
                   "    pm.expect(json).to.be.an('array'); \r",
                   "});\r",
                   "\r",
-                  "pm.test(\"Heatmap not empty\", function () {\r",
-                  "    pm.expect(json.length).to.be.greaterThan(0); \r",
+                  "pm.test(\"Heatmap contains 30 days\", function () {\r",
+                  "    pm.expect(json.length).to.have.lengthOf(30); \r",
                   "});\r",
                   "\r",
                   "pm.test(\"Heatmap items valid\", function () {\r",
-                  "    if (json.length > 0) {\r",
-                  "        let item = json[0];\r",
-                  "\r",
+                  "    json.forEach(item => {\r",
                   "        pm.expect(item).to.have.property(\"date\");\r",
                   "        pm.expect(item).to.have.property(\"done\");\r",
+                  "        pm.expect(item).to.have.property(\"note\");\r",
                   "\r",
                   "        pm.expect(item.date).to.be.a(\"string\");\r",
                   "        pm.expect(item.done).to.be.a(\"boolean\");\r",
-                  "    }\r",
+                  "    });\r",
                   "});\r",
                   "\r",
-                  "pm.test(\"At least one day is marked done\", function () {\r",
-                  "    const hasDone = json.some(item => item.done === true);\r",
-                  "    pm.expect(hasDone).to.be.true;\r",
+                  "pm.test(\"Completed day contains expected note\", function () {\r",
+                  "    const today = new Date().toISOString().split(\"T\")[0];\r",
+                  "\r",
+                  "    const completedDay = json.find(item => item.date === today);\r",
+                  "   \r",
+                  "    pm.expect(completedDay).to.exist\r",
+                  "    pm.expect(completedDay.done).to.be.true;\r",
+                  "    pm.expect(completedDay.note).to.eql(\"Completed today\")\r",
                   "});\r",
                   "\r",
                   "\r",
@@ -1292,7 +1292,7 @@
                 ""
               ]
             },
-            "description": "## Habit Heatmap\n\nRetrieves a heatmap of habit completion data for a specific habit. The response provides a day-by-day breakdown of whether the habit was completed, making it useful for visualizing consistency and streaks over time.\n\n---\n\n### Method & URL\n\n```\nGET {{base_url}}/habits/{{habit_id}}/heatmap/\n\n ```\n\n---\n\n### Variables\n\n| Variable | Description |\n| --- | --- |\n| `base_url` | The base URL of the API (e.g., `https://api.example.com`) |\n| `habit_id` | The unique identifier of the habit to retrieve heatmap data for |\n| `access_token` | Bearer token used for authentication — included in the `Authorization` header |\n\n---\n\n### Response\n\nReturns a **JSON array** of objects, each representing a single day's completion status for the habit.\n\n**Example response:**\n\n``` json\n[\n  { \"date\": \"2024-01-01\", \"done\": true },\n  { \"date\": \"2024-01-02\", \"done\": false },\n  { \"date\": \"2024-01-03\", \"done\": true }\n]\n\n ```\n\n**Response object fields:**\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `date` | `string` | The date of the entry (ISO 8601 format, e.g., `\"2024-01-01\"`) |\n| `done` | `boolean` | Whether the habit was completed on that date |\n\n---\n\n### Expected Behaviour\n\n- The response array is expected to be **non-empty**.\n    \n- At least **one item** in the array should have `done: true`, indicating the habit has been completed at least once."
+            "description": "Retrieves a 30-day activity heatmap for a specific habit.\n\nReturns an array of daily entries covering the last 30 days, each indicating whether the habit was completed on that day, along with an optional note.\n\n**Authentication:** Requires a valid `access_token` (Bearer token).\n\n**Path variables:**\n\n- `habit_id` — The unique identifier of the habit to retrieve the heatmap for.\n    \n\n**Response:**  \nReturns a JSON array of 30 objects, one per day, in the following shape:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `date` | string | The date of the entry in `YYYY-MM-DD` format. |\n| `done` | boolean | Whether the habit was marked as done on that day. |\n| `note` | string | null | An optional note recorded for that day. |\n\n**Example response:**\n\n``` json\n[\n  {\n    \"date\": \"2026-07-18\",\n    \"done\": true,\n    \"note\": \"Completed today\"\n  },\n  {\n    \"date\": \"2026-07-17\",\n    \"done\": false,\n    \"note\": null\n  }\n]\n\n ```"
           },
           "response": []
         },
