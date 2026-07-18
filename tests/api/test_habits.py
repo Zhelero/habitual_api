@@ -900,15 +900,19 @@ class TestHabitHeatmap:
         assert isinstance(data, list)
         assert len(data) == 30
 
-        item = data[0]
+        assert all("date" in item for item in data)
+        assert all("done" in item for item in data)
+        assert all("note" in item for item in data)
 
-        assert "date" in item
-        assert "done" in item
+        assert all(isinstance(item["date"], str) for item in data)
+        assert all(isinstance(item["done"], bool) for item in data)
+        assert all(
+            isinstance(item["note"], str) or item["note"] is None for item in data
+        )
 
-        assert isinstance(item["date"], str)
-        assert isinstance(item["done"], bool)
-
-    def test_heatmap_reflects_done(self, client, auth_headers, freeze_time, base_time):
+    def test_heatmap_reflects_done_without_note(
+        self, client, auth_headers, freeze_time, base_time
+    ):
         email = random_email()
         with freeze_time(base_time):
             register_user(client, email, DEFAULT_PASSWORD)
@@ -917,7 +921,7 @@ class TestHabitHeatmap:
             response = client.post(
                 f"/habits/{habit_id}/done/",
                 headers=auth_headers,
-                json={},
+                json={"note": None},
             )
             assert response.status_code == 204
 
@@ -931,6 +935,35 @@ class TestHabitHeatmap:
             today_entry = next(day for day in data if day["date"] == today)
 
             assert today_entry["done"] is True
+            assert today_entry["note"] is None
+
+    def test_heatmap_reflects_done_with_note(
+        self, client, auth_headers, freeze_time, base_time
+    ):
+        email = random_email()
+        note = "Something new"
+        with freeze_time(base_time):
+            register_user(client, email, DEFAULT_PASSWORD)
+            auth_headers = get_auth_headers(client, email, DEFAULT_PASSWORD)
+            habit_id = get_habit_id(client, auth_headers)
+            response = client.post(
+                f"/habits/{habit_id}/done/",
+                headers=auth_headers,
+                json={"note": note},
+            )
+            assert response.status_code == 204
+
+            data = client.get(
+                f"/habits/{habit_id}/heatmap/",
+                headers=auth_headers,
+            ).json()
+
+            today = base_time.date().isoformat()
+
+            today_entry = next(day for day in data if day["date"] == today)
+
+            assert today_entry["done"] is True
+            assert today_entry["note"] == note
 
 
 # Helper
