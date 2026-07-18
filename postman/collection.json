@@ -1233,7 +1233,7 @@
                   "});\r",
                   "\r",
                   "pm.test(\"Heatmap contains 30 days\", function () {\r",
-                  "    pm.expect(json.length).to.have.lengthOf(30); \r",
+                  "    pm.expect(json).to.have.lengthOf(30); \r",
                   "});\r",
                   "\r",
                   "pm.test(\"Heatmap items valid\", function () {\r",
