@@ -30,6 +30,11 @@ def habit(db, repo, user):
     return repo.create_habit(user.id, random_habit_name(), None)
 
 
+@pytest.fixture
+def other_habit(db, repo, user):
+    return repo.create_habit(user.id, random_habit_name(), None)
+
+
 class TestCreateHabit:
     def test_returns_habit_with_id(self, user, repo):
         h = repo.create_habit(user.id, "Habit name", None)
@@ -375,6 +380,74 @@ class TestAddLog:
 
         assert log1 is not None
         assert log2 is not None
+
+
+class TestUpdateLog:
+    def test_edit_habit_log_note(self, user, habit, repo):
+        today = date.today()
+        note = "Actual note"
+        new_note = "New note"
+
+        repo.add_log(user.id, habit.id, today, note)
+
+        log = repo.update_log_note(user.id, habit.id, today, new_note)
+
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note == new_note
+
+    def test_edit_habit_log_note_from_text_to_none(self, user, habit, repo):
+        today = date.today()
+        note = "Actual note"
+
+        repo.add_log(user.id, habit.id, today, note)
+
+        log = repo.update_log_note(user.id, habit.id, today, None)
+
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note is None
+
+    def test_edit_habit_log_note_from_none_to_text(self, user, habit, repo):
+        today = date.today()
+        new_note = "New note"
+
+        repo.add_log(user.id, habit.id, today, None)
+
+        log = repo.update_log_note(user.id, habit.id, today, new_note)
+
+        assert log.habit_id == habit.id
+        assert log.date == today
+        assert log.note == new_note
+
+    def test_cannot_edit_another_habit_note(self, user, habit, other_habit, repo):
+        today = date.today()
+        note = "Actual note"
+        new_note = "New note"
+
+        repo.add_log(user.id, habit.id, today, note)
+
+        result = repo.update_log_note(user.id, other_habit.id, today, new_note)
+
+        assert result is None
+
+        logs = repo.get_logs_by_habit(user.id, habit.id)
+        assert logs[0].note == note
+
+    def test_edit_habit_log_note_wrong_user_returns_none(self, other_user, habit, repo):
+        today = date.today()
+        note = "Don't change it"
+
+        repo.add_log(habit.user_id, habit.id, today, note)
+
+        result = repo.update_log_note(other_user.id, habit.id, today, None)
+
+        assert result is None
+
+        logs = repo.get_logs_by_habit(habit.user_id, habit.id)
+
+        assert len(logs) == 1
+        assert logs[0].note == note
 
 
 class TestDeleteLog:
