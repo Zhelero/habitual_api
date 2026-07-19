@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta, timezone, datetime
+from datetime import date, timedelta, timezone, datetime
 from typing import Any
 from sqlalchemy.exc import IntegrityError
 
@@ -11,6 +11,7 @@ from app.core.exceptions import (
     HabitAlreadyExistsError,
     HabitAlreadyMarkedError,
     HabitNotMarkedError,
+    LogNotEditableError,
     HabitArchivedError,
     NotFoundError,
     NameCannotBeEmptyError,
@@ -165,6 +166,45 @@ class HabitService:
             "Habit marked done user_id=%s habit_id=%s",
             user_id,
             habit_id,
+        )
+        return log
+
+    # Update habit log note
+
+    def update_habit_log_note(
+        self, user_id: int, habit_id: int, log_date: date, note: str | None
+    ) -> HabitLog | None:
+        self._get_habit_or_raise(user_id, habit_id)
+
+        today = datetime.now(timezone.utc).date()
+
+        if log_date != today:
+            logger.warning(
+                "Update note failed: date not editable user_id=%s habit_id=%s date=%s",
+                user_id,
+                habit_id,
+                log_date,
+            )
+            raise LogNotEditableError()
+
+        if note is not None:
+            note = note.strip() or None
+
+        log = self.repo.update_log_note(user_id, habit_id, log_date, note)
+        if log is None:
+            logger.warning(
+                "Update note failed: no log for date user user_id=%s habit_id=%s date=%s",
+                user_id,
+                habit_id,
+                log_date,
+            )
+            raise HabitNotMarkedError()
+
+        logger.info(
+            "Habit log updated user_id=%s habit_id=%s date=%s",
+            user_id,
+            habit_id,
+            log_date,
         )
         return log
 
