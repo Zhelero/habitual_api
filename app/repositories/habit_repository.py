@@ -152,6 +152,31 @@ class HabitRepository:
 
         return log
 
+    def update_log_note(
+        self, user_id: int, habit_id: int, log_date: date, note: str | None
+    ) -> HabitLog | None:
+        stmt = select(HabitLog).where(
+            HabitLog.date == log_date,
+            self._user_habit_filter(user_id, habit_id),
+        )
+
+        log = self.db.execute(stmt).scalar_one_or_none()
+
+        if not log:
+            return None
+
+        log.note = note
+        self.db.flush()
+
+        logger.info(
+            "Update habit log note user_id=%s habit_id=%s date=%s",
+            user_id,
+            habit_id,
+            log_date,
+        )
+
+        return log
+
     def get_logs_by_habit(self, user_id: int, habit_id: int) -> list[HabitLog]:
         stmt = (
             select(HabitLog)
