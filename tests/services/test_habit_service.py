@@ -402,7 +402,7 @@ class TestUpdateHabitLogNote:
                 habit.user_id, habit.id, yesterday, "Trying to edit"
             )
 
-    def test_update_wrong_habit_log_note(self, habit_service, habit, user):
+    def test_update_another_habit_log_note_raises(self, habit_service, habit, user):
         today = date.today()
         note = "Actual note"
         new_note = "This is updated note"
