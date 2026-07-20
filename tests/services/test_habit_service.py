@@ -9,6 +9,7 @@ from app.core.exceptions import (
     NotFoundError,
     HabitNotMarkedError,
     HabitAlreadyMarkedError,
+    LogNotEditableError,
     HabitArchivedError,
 )
 from app.repositories.habit_repository import HabitRepository
@@ -294,6 +295,7 @@ class TestMarkDone:
 
         assert log is not None
         assert log.date == date.today()
+        assert log.note is None
 
     def test_marks_done_creates_log_with_note(self, habit_service, habit):
         note = "New note"
@@ -325,6 +327,117 @@ class TestMarkDone:
         assert log.habit_id == habit.id
         assert log.date == today
         assert log.note is None
+
+
+class TestUpdateHabitLogNote:
+    def test_update_habit_log_note(self, habit_service, habit):
+        today = date.today()
+        note = "Current note"
+        new_note = "Updated note text"
+        habit_service.mark_done(habit.user_id, habit.id, note)
+        log = habit_service.update_habit_log_note(
+            habit.user_id, habit.id, today, new_note
+        )
+
+        assert log.date == today
+        assert log.note == new_note
+
+    def test_update_habit_log_note_from_text_to_none(self, habit_service, habit):
+        today = date.today()
+        note = "Current note"
+
+        habit_service.mark_done(habit.user_id, habit.id, note)
+
+        log = habit_service.update_habit_log_note(habit.user_id, habit.id, today, "")
+
+        assert log.date == today
+        assert log.note is None
+
+    def test_update_habit_log_note_from_none_to_text(self, habit_service, habit):
+        today = date.today()
+        new_note = "Current note     "
+
+        habit_service.mark_done(habit.user_id, habit.id, "")
+
+        log = habit_service.update_habit_log_note(
+            habit.user_id, habit.id, today, new_note
+        )
+
+        assert log.date == today
+        assert log.note == new_note.strip()
+
+    def test_update_unmarked_habit_log_note(self, habit_service, habit):
+        today = date.today()
+        note = "Current note"
+
+        with pytest.raises(HabitNotMarkedError):
+            habit_service.update_habit_log_note(habit.user_id, habit.id, today, note)
+
+    def test_update_archived_habit_log_note(self, habit_service, habit):
+        today = date.today()
+        note = "I'll go to archive"
+        new_note = "I'll find you"
+
+        habit_service.mark_done(habit.user_id, habit.id, note)
+
+        habit_service.archive_habit(habit.user_id, habit.id)
+
+        log = habit_service.update_habit_log_note(
+            habit.user_id, habit.id, today, new_note
+        )
+
+        assert log.date == today
+        assert log.note == new_note
+
+    def test_update_archived_habit_log_note_wrong_date_raises(
+        self, habit_service, habit
+    ):
+        yesterday = date.today() - timedelta(days=1)
+        HabitLogFactory(habit=habit, date=yesterday, note="Yesterday's note")
+
+        habit_service.archive_habit(habit.user_id, habit.id)
+
+        with pytest.raises(LogNotEditableError):
+            habit_service.update_habit_log_note(
+                habit.user_id, habit.id, yesterday, "Trying to edit"
+            )
+
+    def test_update_another_habit_log_note_raises(self, habit_service, habit, user):
+        today = date.today()
+        note = "Actual note"
+        new_note = "This is updated note"
+
+        new_habit = HabitFactory(user=user, name="active")
+
+        habit_service.mark_done(habit.user_id, habit.id, note)
+
+        with pytest.raises(HabitNotMarkedError):
+            habit_service.update_habit_log_note(
+                habit.user_id, new_habit.id, today, new_note
+            )
+
+    def test_update_habit_log_note_wrong_date_raises(self, habit_service, habit):
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        habit_service.mark_done(habit.user_id, habit.id, "Today's note")
+
+        with pytest.raises(LogNotEditableError):
+            habit_service.update_habit_log_note(
+                habit.user_id, habit.id, yesterday, "Trying to edit"
+            )
+
+    def test_update_habit_log_note_other_user(self, habit_service, other_user, habit):
+        today = date.today()
+        note = "I'll go to archive"
+        new_note = "I'll find you"
+
+        habit_service.mark_done(habit.user_id, habit.id, note)
+
+        with pytest.raises(NotFoundError):
+            habit_service.update_habit_log_note(
+                other_user.id, habit.id, today, new_note
+            )
 
 
 class TestUndoDone:

@@ -33,6 +33,11 @@ class HabitNotMarkedError(AppError):
     detail = "Habit not marked today"
 
 
+class LogNotEditableError(AppError):
+    status_code = 409
+    detail = "Only today's note can be edited"
+
+
 class HabitArchivedError(AppError):
     status_code = 409
     detail = "Cannot modify an archived habit"
