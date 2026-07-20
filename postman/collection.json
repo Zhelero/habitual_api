@@ -1297,6 +1297,143 @@
           "response": []
         },
         {
+          "name": "Edit habit log note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Habit log note updated\", function () {\r",
+                  "    pm.response.to.have.status(204);\r",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"note\": \"Updated via edit endpoint\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/done/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "done",
+                ""
+              ]
+            },
+            "description": "Updates the note associated with a habit log entry. Use this endpoint to edit the text note on an existing \"done\" record for a specific habit.\n\n## Endpoint\n\n`PATCH {{base_url}}/habits/{{habit_id}}/done/`\n\n## Authentication\n\nRequires a valid Bearer token. Set the `access_token` environment variable before sending this request.\n\n## Path Variables\n\n| Variable | Description |\n| --- | --- |\n| `habit_id` | The unique identifier of the habit whose log note you want to edit. |\n\n## Request Body\n\n``` json\n{\n    \"note\": \"Updated via edit endpoint\"\n}\n\n ```\n\n| Field | Type | Required | Description |\n| --- | --- | --- | --- |\n| `note` | string | No | The updated note text. Omitting the field or sending `null`/an empty string clears the existing note. |\n\n## Response\n\nReturns `204 No Content` on success. No response body is returned.\n\n## Notes\n\n- This endpoint uses `PATCH`, so only the fields provided in the request body will be updated.\n    \n- The `habit_id` variable is typically set automatically by earlier requests in the collection run."
+          },
+          "response": []
+        },
+        {
+          "name": "Habit heatmap (note updated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "let json = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Heatmap is array\", function () {\r",
+                  "    pm.expect(json).to.be.an('array'); \r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Heatmap contains 30 days\", function () {\r",
+                  "    pm.expect(json).to.have.lengthOf(30); \r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Heatmap items valid\", function () {\r",
+                  "    json.forEach(item => {\r",
+                  "        pm.expect(item).to.have.property(\"date\");\r",
+                  "        pm.expect(item).to.have.property(\"done\");\r",
+                  "        pm.expect(item).to.have.property(\"note\");\r",
+                  "\r",
+                  "        pm.expect(item.date).to.be.a(\"string\");\r",
+                  "        pm.expect(item.done).to.be.a(\"boolean\");\r",
+                  "    });\r",
+                  "});\r",
+                  "\r",
+                  "pm.test(\"Completed day contains expected note\", function () {\r",
+                  "    const today = new Date().toISOString().split(\"T\")[0];\r",
+                  "\r",
+                  "    const completedDay = json.find(item => item.date === today);\r",
+                  "   \r",
+                  "    pm.expect(completedDay).to.exist\r",
+                  "    pm.expect(completedDay.done).to.be.true;\r",
+                  "    pm.expect(completedDay.note).to.eql(\"Updated via edit endpoint\")\r",
+                  "});\r",
+                  "\r",
+                  "\r",
+                  "\r",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/habits/{{habit_id}}/heatmap/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "habits",
+                "{{habit_id}}",
+                "heatmap",
+                ""
+              ]
+            },
+            "description": "Retrieves the 30-day heatmap for a specific habit, and verifies that the note for today's entry reflects the value set by the \"Edit habit log note\" endpoint.\n\n## Path Variables\n\n| Variable | Description |\n| --- | --- |\n| `habit_id` | The ID of the habit to retrieve the heatmap for. Stored in the `habit_id` environment variable. |\n\n## Authentication\n\nRequires a valid Bearer token. The `access_token` environment variable must be set.\n\n## Response\n\nReturns a JSON array of 30 objects, one per day, in the following shape:\n\n| Field | Type | Description |\n| --- | --- | --- |\n| `date` | string | The date of the entry in `YYYY-MM-DD` format. |\n| `done` | boolean | Whether the habit was completed on that day. |\n| `note` | string | An optional note attached to the habit log for that day. |\n\n## Tests\n\n- **Heatmap is array** — Confirms the response body is an array.\n    \n- **Heatmap contains 30 days** — Confirms the array has exactly 30 items.\n    \n- **Heatmap items valid** — Confirms each item has `date` (string), `done` (boolean), and `note` fields.\n    \n- **Completed day contains expected note** — Finds today's entry and asserts that `done` is `true` and `note` equals `\"Updated via edit endpoint\"`."
+          },
+          "response": []
+        },
+        {
           "name": "Undo mark",
           "event": [
             {

@@ -1,4 +1,6 @@
 import logging
+from datetime import timezone, datetime
+
 from fastapi import APIRouter, Depends, Query, status
 
 from app.db.models import User
@@ -172,6 +174,33 @@ def mark_done(
 
     note = request.note if request.note else None
     service.mark_done(user.id, habit_id, note)
+
+    return None
+
+
+# Update habit log note
+
+
+@router.patch(
+    "/{habit_id}/done/",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Update today's habit note",
+)
+def update_habit_log_note(
+    habit_id: int,
+    request: HabitDoneRequest,
+    user: User = Depends(get_current_user),
+    service: HabitService = Depends(get_habit_service),
+):
+    logger.info(
+        "Update habit log note user_id=%s habit_id=%s",
+        user.id,
+        habit_id,
+    )
+
+    service.update_habit_log_note(
+        user.id, habit_id, datetime.now(timezone.utc).date(), request.note
+    )
 
     return None
 
