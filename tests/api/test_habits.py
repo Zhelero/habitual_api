@@ -12,7 +12,7 @@ from tests.utils.helpers import (
     get_auth_headers,
     random_email,
 )
-from datetime import timedelta
+from datetime import timedelta, date
 
 
 class TestCreateHabit:
@@ -583,6 +583,307 @@ class TestMarkDone:
 
     def test_mark_done_no_token(self, client, habit):
         response = client.post(f"/habits/{habit.id}/done/", json={})
+
+        assert response.status_code == 401
+
+
+class TestUpdateHabitLogNote:
+    def test_update_habit_log_note(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Morning run"},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Midnight sleep   "},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] == "Midnight sleep"
+
+    def test_update_habit_log_note_from_text_to_none(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Morning run"},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "   "},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] is None
+
+    def test_update_habit_log_without_note(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Morning run"},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] is None
+
+    def test_update_habit_log_note_from_none_to_text(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Something is happening"},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] == "Something is happening"
+
+    def test_update_archived_habit_log_note(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Good morning"},
+        )
+
+        assert create_response.status_code == 204
+
+        archive_response = client.patch(
+            f"/habits/{habit.id}/archive/",
+            headers=auth_headers,
+        )
+
+        assert archive_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Well done"},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] == "Well done"
+
+    def test_update_habit_log_note_accepts_500_chars(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "Morning run"},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={"note": "a" * 500},
+        )
+
+        assert response.status_code == 204
+
+        data = client.get(
+            f"/habits/{habit.id}/heatmap/",
+            headers=auth_headers,
+        ).json()
+
+        today_log = next(
+            item for item in data if item["date"] == date.today().isoformat()
+        )
+        assert today_log["note"] == "a" * 500
+
+    def test_update_habit_log_note_rejects_too_long_note(
+        self, client, auth_headers, habit
+    ):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/", json={"note": "a" * 501}, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+
+    def test_update_unmarked_habit_log_note(self, client, auth_headers, habit):
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            json={"note": "It's done"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409
+
+    def test_update_another_habit_log_note(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        new_habit = client.post(
+            "/habits/",
+            json={"name": "Hello"},
+            headers=auth_headers,
+        ).json()
+
+        response = client.patch(
+            f"/habits/{new_habit['id']}/done/",
+            json={"note": "It's done"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409
+
+    def test_update_nonexistent_habit_log_note(self, client, auth_headers, habit):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            "/habits/999999/done/", json={"note": "It's done"}, headers=auth_headers
+        )
+
+        assert response.status_code == 404
+
+    def test_update_other_user_habit_log_note(self, client):
+        user1 = register_user(client)
+        user2 = register_user(client)
+
+        habit = client.post(
+            "/habits/",
+            json={"name": random_habit_name()},
+            headers=auth(user1["access_token"]),
+        ).json()
+
+        client.post(
+            f"/habits/{habit['id']}/done/",
+            headers=auth(user1["access_token"]),
+            json={},
+        )
+
+        response = client.patch(
+            f"/habits/{habit['id']}/done/",
+            headers=auth(user2["access_token"]),
+            json={"note": "It's done"},
+        )
+
+        assert response.status_code == 404
+
+    def test_update_habit_log_note_requires_body(self, client, habit, auth_headers):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(f"/habits/{habit.id}/done/", headers=auth_headers)
+
+        assert response.status_code == 422
+
+    def test_update_habit_log_note_wrong_token(self, client, habit, auth_headers):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(
+            f"/habits/{habit.id}/done/",
+            headers={"Authorization": "Bearer wrong_token"},
+            json={},
+        )
+        assert response.status_code == 401
+
+    def test_update_habit_log_note_no_token(self, client, habit, auth_headers):
+        create_response = client.post(
+            f"/habits/{habit.id}/done/",
+            headers=auth_headers,
+            json={},
+        )
+
+        assert create_response.status_code == 204
+
+        response = client.patch(f"/habits/{habit.id}/done/", json={})
 
         assert response.status_code == 401
 
