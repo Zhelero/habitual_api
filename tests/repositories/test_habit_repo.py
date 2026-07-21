@@ -1,6 +1,7 @@
 import pytest
-from datetime import date, timedelta
+from datetime import timedelta, datetime, timezone
 
+from app.db.models import User, Habit
 from app.repositories.habit_repository import HabitRepository
 from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password
@@ -11,27 +12,27 @@ from app.core.enums import HabitFilter
 
 
 @pytest.fixture
-def repo(db):
+def repo(db) -> HabitRepository:
     return HabitRepository(db)
 
 
 @pytest.fixture
-def user(db):
+def user(db) -> User:
     return UserRepository(db).create_user(random_email(), hash_password("12345678"))
 
 
 @pytest.fixture
-def other_user(db):
+def other_user(db) -> User:
     return UserRepository(db).create_user(random_email(), hash_password("12345678"))
 
 
 @pytest.fixture
-def habit(db, repo, user):
+def habit(db, repo, user) -> Habit:
     return repo.create_habit(user.id, random_habit_name(), None)
 
 
 @pytest.fixture
-def other_habit(db, repo, user):
+def other_habit(db, repo, user) -> Habit:
     return repo.create_habit(user.id, random_habit_name(), None)
 
 
@@ -331,7 +332,7 @@ class TestRestoreHabit:
 
 class TestAddLog:
     def test_returns_log(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         log = repo.add_log(user.id, habit.id, today)
 
         assert log is not None
@@ -340,7 +341,7 @@ class TestAddLog:
         assert log.note is None
 
     def test_add_log_with_note(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "New note"
         log = repo.add_log(user.id, habit.id, today, note)
 
@@ -350,7 +351,7 @@ class TestAddLog:
         assert log.note == note
 
     def test_duplicate_date_returns_none(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today)
 
         result = repo.add_log(user.id, habit.id, today)
@@ -358,7 +359,7 @@ class TestAddLog:
         assert result is None
 
     def test_duplicate_date_with_note_returns_none(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "New note"
         repo.add_log(user.id, habit.id, today, note)
 
@@ -367,12 +368,14 @@ class TestAddLog:
         assert result is None
 
     def test_wrong_user_returns_none(self, other_user, habit, repo):
-        result = repo.add_log(other_user.id, habit.id, date.today())
+        result = repo.add_log(
+            other_user.id, habit.id, datetime.now(timezone.utc).date()
+        )
 
         assert result is None
 
     def test_different_dates_allowed(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         yesterday = today - timedelta(days=1)
 
         log1 = repo.add_log(user.id, habit.id, today)
@@ -384,7 +387,7 @@ class TestAddLog:
 
 class TestUpdateLog:
     def test_edit_habit_log_note(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Actual note"
         new_note = "New note"
 
@@ -397,7 +400,7 @@ class TestUpdateLog:
         assert log.note == new_note
 
     def test_edit_habit_log_note_from_text_to_none(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Actual note"
 
         repo.add_log(user.id, habit.id, today, note)
@@ -409,7 +412,7 @@ class TestUpdateLog:
         assert log.note is None
 
     def test_edit_habit_log_note_from_none_to_text(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         new_note = "New note"
 
         repo.add_log(user.id, habit.id, today, None)
@@ -421,7 +424,7 @@ class TestUpdateLog:
         assert log.note == new_note
 
     def test_cannot_edit_another_habit_note(self, user, habit, other_habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Actual note"
         new_note = "New note"
 
@@ -435,7 +438,7 @@ class TestUpdateLog:
         assert logs[0].note == note
 
     def test_edit_habit_log_note_wrong_user_returns_none(self, other_user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Don't change it"
 
         repo.add_log(habit.user_id, habit.id, today, note)
@@ -452,7 +455,7 @@ class TestUpdateLog:
 
 class TestDeleteLog:
     def test_deletes_logs_with_note(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Good day"
         repo.add_log(user.id, habit.id, today, note)
 
@@ -464,12 +467,12 @@ class TestDeleteLog:
         assert logs == []
 
     def test_missing_log_returns_false(self, user, habit, repo):
-        result = repo.delete_log(user.id, habit.id, date.today())
+        result = repo.delete_log(user.id, habit.id, datetime.now(timezone.utc).date())
 
         assert result is False
 
     def test_wrong_user_returns_false(self, other_user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(habit.user_id, habit.id, today)
 
         result = repo.delete_log(other_user.id, habit.id, today)
@@ -479,7 +482,7 @@ class TestDeleteLog:
 
 class TestGetLogs:
     def test_get_logs_by_habit_ordered_desc(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today - timedelta(days=2))
         repo.add_log(user.id, habit.id, today - timedelta(days=1))
         repo.add_log(user.id, habit.id, today)
@@ -491,7 +494,7 @@ class TestGetLogs:
 
     def test_get_logs_by_habit_isolates_user(self, user, other_user, habit, repo):
         h_other = repo.create_habit(other_user.id, random_habit_name(), None)
-        repo.add_log(other_user.id, h_other.id, date.today())
+        repo.add_log(other_user.id, h_other.id, datetime.now(timezone.utc).date())
 
         logs = repo.get_logs_by_habit(user.id, h_other.id)
 
@@ -499,7 +502,7 @@ class TestGetLogs:
 
     def test_get_all_logs_returns_only_own(self, user, other_user, habit, repo):
         h_other = repo.create_habit(other_user.id, random_habit_name(), None)
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         repo.add_log(user.id, habit.id, today)
         repo.add_log(other_user.id, h_other.id, today)
@@ -512,7 +515,7 @@ class TestGetLogs:
 
 class TestCountLogsBetween:
     def test_counts_within_range(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         for i in range(3):
             repo.add_log(user.id, habit.id, today - timedelta(days=i))
 
@@ -526,7 +529,7 @@ class TestCountLogsBetween:
         assert count == 3
 
     def test_start_and_end_inclusive(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         start = today - timedelta(days=6)
 
         repo.add_log(user.id, habit.id, start)
@@ -537,7 +540,7 @@ class TestCountLogsBetween:
         assert count == 2
 
     def test_excludes_out_of_range(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today - timedelta(days=8))
 
         count = repo.count_logs_between(
@@ -550,7 +553,7 @@ class TestCountLogsBetween:
         assert count == 0
 
     def test_returns_zero_no_logs(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         count = repo.count_logs_between(
             user.id,
             habit.id,
@@ -561,7 +564,7 @@ class TestCountLogsBetween:
         assert count == 0
 
     def test_count_logs_between_isolated(self, user, other_user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today)
 
         count = repo.count_logs_between(
@@ -584,7 +587,7 @@ class TestGetHeatmap:
         assert "done" in result[0]
 
     def test_logged_day_returns_done_status_and_note(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "It's done"
         repo.add_log(user.id, habit.id, today, note)
 
@@ -595,7 +598,7 @@ class TestGetHeatmap:
         assert today_entry["note"] == note
 
     def test_logged_day_without_note_returns_done_and_no_note(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today)
 
         result = repo.get_heatmap(user.id, habit.id)
@@ -611,7 +614,7 @@ class TestGetHeatmap:
         assert all(r["note"] is None for r in result)
 
     def test_ordered_ascending(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         then = today - timedelta(days=29)
         result = repo.get_heatmap(user.id, habit.id)
 
@@ -629,19 +632,19 @@ class TestCountCompletedToday:
         h1 = repo.create_habit(user.id, random_habit_name(), None)
         h2 = repo.create_habit(user.id, random_habit_name(), None)
 
-        repo.add_log(user.id, h1.id, date.today())
-        repo.add_log(user.id, h2.id, date.today())
+        repo.add_log(user.id, h1.id, datetime.now(timezone.utc).date())
+        repo.add_log(user.id, h2.id, datetime.now(timezone.utc).date())
 
         assert repo.count_completed_today(user.id) == 2
 
     def test_does_not_count_yesterday(self, user, habit, repo):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         repo.add_log(user.id, habit.id, today - timedelta(days=1))
 
         assert repo.count_completed_today(user.id) == 0
 
     def test_isolated_from_other_user(self, user, other_user, habit, repo):
         h_other = repo.create_habit(other_user.id, random_habit_name(), None)
-        repo.add_log(other_user.id, h_other.id, date.today())
+        repo.add_log(other_user.id, h_other.id, datetime.now(timezone.utc).date())
 
         assert repo.count_completed_today(user.id) == 0

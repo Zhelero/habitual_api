@@ -1,5 +1,5 @@
 import pytest
-from datetime import timedelta, date
+from datetime import timedelta, datetime, timezone
 
 from app.core.exceptions import HabitAlreadyMarkedError
 from app.services.dashboard_service import DashboardService
@@ -47,7 +47,7 @@ class TestDashboardEmpty:
     def test_deleted_habit_not_in_stats(self, user, dashboard, db):
         habit = HabitFactory(user=user)
 
-        HabitLogFactory(habit=habit, date=date.today())
+        HabitLogFactory(habit=habit, date=datetime.now(timezone.utc).date())
 
         db.delete(habit)
         db.commit()
@@ -92,8 +92,8 @@ class TestCompletedToday:
     def test_completed_today_multiple(self, user, dashboard):
         habits = HabitFactory.create_batch(3, user=user)
 
-        HabitLogFactory(habit=habits[0], date=date.today())
-        HabitLogFactory(habit=habits[1], date=date.today())
+        HabitLogFactory(habit=habits[0], date=datetime.now(timezone.utc).date())
+        HabitLogFactory(habit=habits[1], date=datetime.now(timezone.utc).date())
 
         stats = dashboard.get_dashboard_stats(user.id)
 
@@ -243,11 +243,14 @@ class TestDashboardStatsWithArchivedHabits:
     def test_archived_habit_excluded_from_best_streak(self, user, habits, dashboard):
         archived = habits.create_habit(user.id, "archived", None)
         for i in range(5):
-            HabitLogFactory(habit=archived, date=date.today() - timedelta(days=i))
+            HabitLogFactory(
+                habit=archived,
+                date=datetime.now(timezone.utc).date() - timedelta(days=i),
+            )
         habits.archive_habit(user.id, archived.id)
 
         active = habits.create_habit(user.id, "active", None)
-        HabitLogFactory(habit=active, date=date.today())
+        HabitLogFactory(habit=active, date=datetime.now(timezone.utc).date())
 
         stats = dashboard.get_dashboard_stats(user.id)
 
