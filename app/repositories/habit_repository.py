@@ -237,7 +237,7 @@ class HabitRepository:
         if not habit:
             return []
 
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         start_date = today - timedelta(days=29)
 
         # recursive CTE
