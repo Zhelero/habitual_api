@@ -6,13 +6,13 @@ from app.repositories.blacklist_repository import TokenBlacklistRepository
 
 def test_add_token(db):
     repo = TokenBlacklistRepository(db)
-    token = repo.add("jti1", datetime.now())
+    token = repo.add("jti1", datetime.now(timezone.utc))
     assert token is not None
 
 
 def test_is_blacklisted(db):
     repo = TokenBlacklistRepository(db)
-    repo.add("jti1", datetime.now())
+    repo.add("jti1", datetime.now(timezone.utc))
     assert repo.is_blacklisted("jti1") is True
 
 

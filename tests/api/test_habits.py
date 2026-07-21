@@ -12,7 +12,7 @@ from tests.utils.helpers import (
     get_auth_headers,
     random_email,
 )
-from datetime import timedelta, date
+from datetime import timedelta, datetime, timezone
 
 
 class TestCreateHabit:
@@ -611,7 +611,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] == "Midnight sleep"
 
@@ -638,7 +640,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] is None
 
@@ -665,7 +669,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] is None
 
@@ -692,7 +698,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] == "Something is happening"
 
@@ -726,7 +734,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] == "Well done"
 
@@ -753,7 +763,9 @@ class TestUpdateHabitLogNote:
         ).json()
 
         today_log = next(
-            item for item in data if item["date"] == date.today().isoformat()
+            item
+            for item in data
+            if item["date"] == datetime.now(timezone.utc).date().isoformat()
         )
         assert today_log["note"] == "a" * 500
 

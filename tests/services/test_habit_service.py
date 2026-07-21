@@ -1,5 +1,5 @@
 import pytest
-from datetime import timedelta, date
+from datetime import timedelta, datetime, timezone
 
 from app.core.exceptions import (
     NameCannotBeEmptyError,
@@ -294,7 +294,7 @@ class TestMarkDone:
         log = habit_service.mark_done(habit.user_id, habit.id)
 
         assert log is not None
-        assert log.date == date.today()
+        assert log.date == datetime.now(timezone.utc).date()
         assert log.note is None
 
     def test_marks_done_creates_log_with_note(self, habit_service, habit):
@@ -319,7 +319,7 @@ class TestMarkDone:
             habit_service.mark_done(user.id, 123)
 
     def test_mark_done_blank_note_becomes_none(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "   "
         log = habit_service.mark_done(habit.user_id, habit.id, note)
 
@@ -331,7 +331,7 @@ class TestMarkDone:
 
 class TestUpdateHabitLogNote:
     def test_update_habit_log_note(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Current note"
         new_note = "Updated note text"
         habit_service.mark_done(habit.user_id, habit.id, note)
@@ -343,7 +343,7 @@ class TestUpdateHabitLogNote:
         assert log.note == new_note
 
     def test_update_habit_log_note_from_text_to_none(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Current note"
 
         habit_service.mark_done(habit.user_id, habit.id, note)
@@ -354,7 +354,7 @@ class TestUpdateHabitLogNote:
         assert log.note is None
 
     def test_update_habit_log_note_from_none_to_text(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         new_note = "Current note     "
 
         habit_service.mark_done(habit.user_id, habit.id, "")
@@ -367,14 +367,14 @@ class TestUpdateHabitLogNote:
         assert log.note == new_note.strip()
 
     def test_update_unmarked_habit_log_note(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Current note"
 
         with pytest.raises(HabitNotMarkedError):
             habit_service.update_habit_log_note(habit.user_id, habit.id, today, note)
 
     def test_update_archived_habit_log_note(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "I'll go to archive"
         new_note = "I'll find you"
 
@@ -392,7 +392,7 @@ class TestUpdateHabitLogNote:
     def test_update_archived_habit_log_note_wrong_date_raises(
         self, habit_service, habit
     ):
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
         HabitLogFactory(habit=habit, date=yesterday, note="Yesterday's note")
 
         habit_service.archive_habit(habit.user_id, habit.id)
@@ -403,7 +403,7 @@ class TestUpdateHabitLogNote:
             )
 
     def test_update_another_habit_log_note_raises(self, habit_service, habit, user):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Actual note"
         new_note = "This is updated note"
 
@@ -417,7 +417,7 @@ class TestUpdateHabitLogNote:
             )
 
     def test_update_habit_log_note_wrong_date_raises(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         yesterday = today - timedelta(days=1)
 
         habit_service.mark_done(habit.user_id, habit.id, "Today's note")
@@ -428,7 +428,7 @@ class TestUpdateHabitLogNote:
             )
 
     def test_update_habit_log_note_other_user(self, habit_service, other_user, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "I'll go to archive"
         new_note = "I'll find you"
 
@@ -483,7 +483,7 @@ class TestGetStats:
         assert all(not d["done"] for d in stats["last_7_days"])
 
     def test_current_streak_one_day(self, habit_service, habit):
-        HabitLogFactory(habit=habit, date=date.today())
+        HabitLogFactory(habit=habit, date=datetime.now(timezone.utc).date())
 
         stats = habit_service.get_stats(habit.user_id, habit.id)
 
@@ -491,7 +491,7 @@ class TestGetStats:
         assert stats["best_streak"] == 1
 
     def test_current_streak_consecutive_days(self, habit_service, user, habit):
-        now = date.today()
+        now = datetime.now(timezone.utc).date()
         for i in range(3):
             HabitLogFactory(
                 habit=habit,
@@ -506,17 +506,17 @@ class TestGetStats:
     def test_streak_broken_by_gap(self, habit_service, habit):
         HabitLogFactory(
             habit=habit,
-            date=date.today() - timedelta(days=3),
+            date=datetime.now(timezone.utc).date() - timedelta(days=3),
         )
 
         HabitLogFactory(
             habit=habit,
-            date=date.today() - timedelta(days=2),
+            date=datetime.now(timezone.utc).date() - timedelta(days=2),
         )
 
         HabitLogFactory(
             habit=habit,
-            date=date.today(),
+            date=datetime.now(timezone.utc).date(),
         )
 
         stats = habit_service.get_stats(habit.user_id, habit.id)
@@ -527,7 +527,7 @@ class TestGetStats:
     def test_completion_30_days(self, habit_service, habit):
         HabitLogFactory(
             habit=habit,
-            date=date.today(),
+            date=datetime.now(timezone.utc).date(),
         )
 
         stats = habit_service.get_stats(habit.user_id, habit.id)
@@ -537,12 +537,12 @@ class TestGetStats:
     def test_completion_excludes_out_of_window(self, habit_service, habit):
         HabitLogFactory(
             habit=habit,
-            date=date.today() - timedelta(days=7),
+            date=datetime.now(timezone.utc).date() - timedelta(days=7),
         )
 
         HabitLogFactory(
             habit=habit,
-            date=date.today() - timedelta(days=6),
+            date=datetime.now(timezone.utc).date() - timedelta(days=6),
         )
 
         stats = habit_service.get_stats(habit.user_id, habit.id)
@@ -594,7 +594,7 @@ class TestGetHeatmap:
         assert len(result) == 30
 
     def test_logged_day_returns_done_status_and_note(self, habit_service, habit):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         note = "Some action"
         HabitLogFactory(habit=habit, date=today, note=note)
 
@@ -608,7 +608,7 @@ class TestGetHeatmap:
     def test_logged_day_without_note_returns_done_and_no_note(
         self, habit_service, habit
     ):
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         HabitLogFactory(habit=habit, date=today)
 
         result = habit_service.get_heatmap(habit.user_id, habit.id)
