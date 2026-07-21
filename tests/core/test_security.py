@@ -126,9 +126,14 @@ class TestAuthenticationRequired:
         headers = get_auth_headers(client, email, "12345678")
 
         token = headers["Authorization"].removeprefix("Bearer ")
-        # Flip the last character of the signature — payload looks valid,
-        # signature no longer matches.
-        tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+        # Flip a character safely inside the signature (not the last one —
+        # the final base64url group of an HS256 signature only encodes 4
+        # significant bits, so some replacements there don't actually change
+        # the underlying bytes and the tampered token still verifies).
+        sig_index = len(token) - 10
+        tampered = token[:sig_index] + (
+            "a" if token[sig_index] != "a" else "b" + token[sig_index + 1 :]
+        )
 
         response = client.get(
             "/habits/", headers={"Authorization": f"Bearer {tampered}"}
