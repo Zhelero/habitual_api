@@ -9,7 +9,7 @@ with JWT authentication, PostgreSQL, Alembic, logging middleware and full CI pip
 ![Architecture](https://img.shields.io/badge/architecture-layered-blue)
 ![Auth](https://img.shields.io/badge/auth-JWT%20rotation-green)
 ![Database](https://img.shields.io/badge/db-PostgreSQL-blue)
-![Tests](https://img.shields.io/badge/tests-386%20passed-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-424%20passed-brightgreen?style=flat-square)
 ![Coverage](https://img.shields.io/badge/coverage-~98%25-brightgreen?style=flat-square)
 ![Security](https://img.shields.io/badge/security-rate%20limited%20%2B%20audited-blue?style=flat-square)
 ![CI](https://github.com/Zhelero/habitual_api/actions/workflows/ci.yml/badge.svg)
@@ -44,6 +44,7 @@ and requires its own architecture.
 - Archive / restore habits, with filtering by status
 - Habit statistics (current streak, best streak, completion rate)
 - 30-day heatmap
+- Optional notes on habit completions — attached when marking a habit done, editable only for today's entry
 - Dashboard with aggregated stats
 - Paginated habits list
 - Structured error handling
@@ -128,7 +129,7 @@ tests/
 
 A React UI for this API is available at [habitual_ui](https://github.com/Zhelero/habitual_ui).
 
-Built with React + Vite + Tailwind CSS. Features login, registration, habit management, streak tracking and a 30-day heatmap. Connects to this API running on `http://localhost:8000`.
+Built with React + Vite + Tailwind CSS. Features login, registration, habit management, streak tracking, a 30-day heatmap, and notes on completions. Connects to this API running on `http://localhost:8000`.
 
 To run the full stack locally, start the API first, then the UI:
 
@@ -192,6 +193,13 @@ By default, only active habits are returned. Use the `filter` query parameter to
 ### Mark done
 POST /habits/{id}/done
 
+Optional body: `{"note": "..."}` (max 500 chars). Omitted or blank note is stored as `null`.
+
+### Update today's note
+PATCH /habits/{id}/done
+
+Body: `{"note": "..."}` — replaces the note on **today's** log entry, or clears it if blank/omitted. Only today's log can be edited this way: `409` (`LogNotEditableError`) for any other date, `409` (`HabitNotMarkedError`) if the habit hasn't been marked done today at all.
+
 ### Undo
 DELETE /habits/{id}/done
 
@@ -205,6 +213,8 @@ Archived habits are excluded from the default habit list and dashboard totals, b
 
 ### Heatmap
 GET /habits/{id}/heatmap
+
+Returns the last 30 days as `{"date", "done", "note"}` per day — `note` is `null` for days without one.
 
 ### Dashboard
 GET /dashboard
@@ -362,6 +372,28 @@ curl -X PATCH http://localhost:8000/habits/1/archive/ \
 
 Returns `204 No Content`. The habit is excluded from the default list and dashboard totals, but remains accessible by ID.
 
+### Mark a habit done with a note
+
+```bash
+curl -X POST http://localhost:8000/habits/1/done/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"note": "Felt great today"}'
+```
+
+Returns `204 No Content`. `note` is optional — omit it (or send `null`) to mark done without one.
+
+### Edit today's note
+
+```bash
+curl -X PATCH http://localhost:8000/habits/1/done/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"note": "Actually, felt amazing"}'
+```
+
+Returns `409` if the habit wasn't marked done today, or if today's log has already rolled into a past day — only today's note can be edited.
+
 ### List habits including archived
 
 ```bash
@@ -438,7 +470,7 @@ pytest
 ```
 
 ```
-386 passed in 117.01s
+424 passed in 163.01s
 ```
 
 ## Test Coverage
@@ -486,6 +518,8 @@ for test architecture refactoring to support further scaling.
 **User isolation** — all habit queries are scoped by `user_id`. Accessing another user's habit returns 404 (not 403) to avoid leaking resource existence.
 
 **Habit archiving** — archiving is a soft state change (`is_archived` flag), not a delete. Archived habits keep their full history and remain retrievable by ID, but are excluded from default listings and dashboard aggregates. They cannot be marked done or undone while archived, which keeps the "completed today" count consistent with what the user can still act on.
+
+**Note editing restricted to today** — `update_habit_log_note` only ever targets `datetime.now(timezone.utc).date()`; there's no date parameter to pass a past day in, by design. Past log entries are historical record, not a draft — allowing edits to them would let a user quietly rewrite what "actually happened" on a given day, which undermines the heatmap and stats as a trustworthy log. `HabitNotMarkedError` (no log for today yet) and `LogNotEditableError` (trying to touch anything but today) both return `409`, not `404`, since the habit itself exists — it's the *action* that's invalid for the current state, not the resource that's missing.
 
 **SQLAlchemy 2.0** — uses the modern `Mapped` / `mapped_column` syntax throughout.
 
